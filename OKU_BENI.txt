@@ -1,0 +1,21 @@
+PDF PRO - KURULUM
+=================
+
+1) Bu klasoru kalici bir yere koyun (ornegin Belgeler veya Masaustu).
+   Kurulumdan sonra klasorun yerini degistirmeyin.
+2) KURULUM.bat dosyasina CIFT TIKLAYIN. Gerisini kendisi yapar:
+     - Python kutuphanelerini kurar
+     - OCR motorunu (Tesseract) kurar (Yonetici izni sorarsa EVET deyin)
+     - Masaustune "PDF PRO" kisayolu koyar
+3) Masaustundeki "PDF PRO" ile programi acin.
+
+Ozellikler
+- Birlestir, bol, dondur, sayfa sec / sirala / sil
+- OCR: taranmis PDF'i aranabilir yapma, metin cikarma (Turkce + Ingilizce)
+- Donustur: PDF <-> Word, PDF -> Excel, PDF <-> Resim, Excel -> PDF
+- Imza / kase, antet, filigran, sayfa numarasi
+- Sikistir, sifre koy / kaldir
+
+Program acilmazsa HATA_AYIKLA.bat ile acin; ekrandaki hatayi veya
+klasordeki hata_kaydi.txt dosyasini gonderin.
+Ayrintili kilavuz: program icinde sag ustteki "Kullanim Kilavuzu".
