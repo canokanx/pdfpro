@@ -10,6 +10,7 @@ from collections import OrderedDict
 
 from .cekirdek import fitz, PdfProHata
 from . import duzenle as Z
+from . import teker as TK
 
 WINDOWS = sys.platform.startswith("win")
 PT_PX = 96 / 72          # %100 = gercek boyut (96 dpi ekran)
@@ -196,7 +197,7 @@ class Belge:
 class BelgeGorunumu(tk.Frame):
     """Sayfalari alt alta gosterir; yakinlastirma, kaydirma ve duzenleme modlari."""
 
-    ZEMIN = "#DDE1EA"
+    ZEMIN = "#FFFFFF"
 
     def __init__(self, ust, uygulama):
         super().__init__(ust, bg=self.ZEMIN)
@@ -233,17 +234,13 @@ class BelgeGorunumu(tk.Frame):
 
         t = self.tuval
         t.bind("<Configure>", lambda e: self._yeniden_yerlestir())
-        t.bind("<MouseWheel>", self._teker)
-        t.bind("<Control-MouseWheel>", self._ctrl_teker)
-        t.bind("<Button-4>", lambda e: self._teker_linux(e, -1))
-        t.bind("<Button-5>", lambda e: self._teker_linux(e, 1))
+        TK.kaydet(t, self._kaydir_olay)        # tekerlek + touchpad (pdfpro/teker.py)
         t.bind("<ButtonPress-1>", self._bas)
         t.bind("<B1-Motion>", self._surukle_hareket)
         t.bind("<ButtonRelease-1>", self._birak)
         t.bind("<Motion>", self._hareket)
         t.bind("<Leave>", lambda e: self._vurgu_temizle())
         t.bind("<Double-Button-1>", self._cift_tik)
-        t.bind("<Shift-MouseWheel>", lambda e: (t.xview_scroll(int(-e.delta / 40) or (-1 if e.delta > 0 else 1), "units"), "break")[1])
         t.bind("<ButtonPress-2>", lambda e: t.scan_mark(e.x, e.y))
         t.bind("<B2-Motion>", lambda e: (t.scan_dragto(e.x, e.y, gain=1), self._gecikmeli_ciz()))
         t.bind("<Up>", lambda e: self._ok_tusu(e, 0, -1) or self._kaydir_birim(-2))
@@ -318,8 +315,8 @@ class BelgeGorunumu(tk.Frame):
         t.configure(scrollregion=(0, 0, self.genislik, y))
         self._ys = [yy for (_, yy, _, _) in self.yerler]
         for i, (x, y0, w, h) in enumerate(self.yerler):
-            t.create_rectangle(x + 3, y0 + 3, x + w + 3, y0 + h + 3, fill="#B9C1CD", outline="", tags="golge")
-            t.create_rectangle(x, y0, x + w, y0 + h, fill="white", outline="#C5CCD8", tags=("kagit", f"k{i}"))
+            t.create_rectangle(x + 3, y0 + 3, x + w + 3, y0 + h + 3, fill="#D1D5DB", outline="", tags="golge")
+            t.create_rectangle(x, y0, x + w, y0 + h, fill="white", outline="#C9CDD3", tags=("kagit", f"k{i}"))
         if oran is not None:
             i, kesir = oran
             if i < len(self.yerler):
@@ -666,6 +663,16 @@ class BelgeGorunumu(tk.Frame):
         else:
             yeni = next((a for a in reversed(adimlar) if a < su_an - 0.01), 0.25)
         self.zoom_ayarla(yeni)
+
+    def _kaydir_olay(self, dy, dx, zoom):
+        if zoom:
+            self.zoom_adim(zoom)
+            return
+        if dy:
+            self.tuval.yview_scroll(dy, "units")
+        if dx:
+            self.tuval.xview_scroll(dx, "units")
+        self._gecikmeli_ciz()
 
     def _teker(self, e):
         if e.state & 0x0004:
@@ -1015,7 +1022,7 @@ class BelgeGorunumu(tk.Frame):
         from tkinter import ttk, colorchooser
         from . import fontlar
         st = self._stil
-        f = tk.Frame(self.tuval, bg="#312E81", padx=4, pady=3)
+        f = tk.Frame(self.tuval, bg="white", padx=4, pady=3, highlightthickness=1, highlightbackground="#D1D5DB")
         aileler = ["Otomatik (orijinal)"] + (fontlar.aileler() if fontlar.hazir() else fontlar.ONERILEN)
         aile = ttk.Combobox(f, values=aileler, width=22, state="readonly", font=("Segoe UI" if WINDOWS else "DejaVu Sans", 9))
         aile.set(st["aile"] if st["aile"] in aileler else "Otomatik (orijinal)")
@@ -1024,8 +1031,8 @@ class BelgeGorunumu(tk.Frame):
         sp = ttk.Spinbox(f, from_=4, to=144, increment=0.5, width=5, textvariable=boyut)
         sp.pack(side="left", padx=2)
         kalin = tk.BooleanVar(value=st["kalin"])
-        kb = tk.Checkbutton(f, text="K", variable=kalin, bg="#312E81", fg="white", selectcolor="#4338CA",
-                            font=("Arial", 9, "bold"), activebackground="#312E81", activeforeground="white")
+        kb = tk.Checkbutton(f, text="K", variable=kalin, bg="white", fg="#111827", selectcolor="#E5E7EB",
+                            font=("Arial", 9, "bold"), activebackground="#F3F4F6", activeforeground="#111827")
         kb.pack(side="left", padx=2)
         renk_btn = tk.Label(f, text="  ", bg="#%02x%02x%02x" % tuple(int(max(0, min(1, c)) * 255) for c in st["renk"]),
                             relief="solid", bd=1, width=3, cursor="hand2")
@@ -1033,8 +1040,8 @@ class BelgeGorunumu(tk.Frame):
         hiza = tk.StringVar(value=st["hiza"])
         for deger, simge in (("sol", "⇤"), ("orta", "⇔"), ("sag", "⇥")):
             tk.Radiobutton(f, text=simge, value=deger, variable=hiza, indicatoron=False, width=2,
-                           bg="#4338CA", fg="white", selectcolor="#4F46E5", font=("Arial", 9),
-                           activebackground="#6366F1", bd=0).pack(side="left", padx=1)
+                           bg="#F3F4F6", fg="#111827", selectcolor="#D1D5DB", font=("Arial", 9),
+                           activebackground="#E5E7EB", bd=0).pack(side="left", padx=1)
         tk.Button(f, text="✔", bg="#10B981", fg="white", bd=0, padx=8, font=("Arial", 9, "bold"),
                   command=lambda: self._duzenleyici_kapat(True)).pack(side="left", padx=(6, 2))
         tk.Button(f, text="✖", bg="#E11D48", fg="white", bd=0, padx=8, font=("Arial", 9, "bold"),
@@ -1164,7 +1171,7 @@ class _MetinOkuyucu:
 # ================================================================== kucuk resimler
 class KucukResimler(tk.Frame):
     GEN = 118
-    ZEMIN = "#F6F7FB"
+    ZEMIN = "#FFFFFF"
 
     def __init__(self, ust, uygulama):
         super().__init__(ust, bg=self.ZEMIN)
@@ -1182,9 +1189,7 @@ class KucukResimler(tk.Frame):
         sb.pack(side="left", fill="y")
         t = self.tuval
         t.bind("<Configure>", lambda e: self.yerlestir())
-        t.bind("<MouseWheel>", lambda e: (t.yview_scroll(int(-e.delta / 40) or (-1 if e.delta > 0 else 1), "units"), self._gecikmeli()))
-        t.bind("<Button-4>", lambda e: (t.yview_scroll(-3, "units"), self._gecikmeli()))
-        t.bind("<Button-5>", lambda e: (t.yview_scroll(3, "units"), self._gecikmeli()))
+        TK.kaydet(t, lambda dy, dx, z: dy and (t.yview_scroll(dy, "units"), self._gecikmeli()))
         t.bind("<ButtonPress-1>", self._bas)
         t.bind("<B1-Motion>", self._hareket)
         t.bind("<ButtonRelease-1>", self._birak)
@@ -1234,7 +1239,7 @@ class KucukResimler(tk.Frame):
             secili = i in self.belge.secili
             aktif = i == self.belge.aktif
             if secili:
-                t.create_rectangle(x - 7, y - 7, x + w + 7, y + h + 24, fill="#E0E7FF",
+                t.create_rectangle(x - 7, y - 7, x + w + 7, y + h + 24, fill="#E5E7EB",
                                    outline="#4F46E5", width=2, tags="cerceve")
             t.create_rectangle(x, y, x + w, y + h, fill="white", outline="#9AA5B4" if not aktif else "#4F46E5",
                                width=1 if not aktif else 2, tags=("cerceve", "kutu"))

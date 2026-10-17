@@ -173,7 +173,7 @@ class ImzaDiyalog(Diyalog):
                 continue
             self._fotolar.append(ft)
             secili = y == self.yol.get()
-            b = tk.Button(self._gecmis_cerceve, image=ft, bg="#E0E7FF" if secili else "white", relief="solid",
+            b = tk.Button(self._gecmis_cerceve, image=ft, bg="#E5E7EB" if secili else "white", relief="solid",
                           bd=2 if secili else 1, width=90, height=56, cursor="hand2",
                           command=lambda yy=y: (self.yol.set(yy), self._tamam()))
             b.pack(side="left", padx=3, pady=4)

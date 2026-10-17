@@ -28,6 +28,7 @@ from . import resim_yazi as R
 from . import fontlar
 from .ek_arayuz import EkIslemler
 from . import vitrin as V
+from . import teker as TK
 
 try:
     from tkinterdnd2 import TkinterDnD, DND_FILES
@@ -42,15 +43,15 @@ HATA_KAYDI = os.path.join(PROGRAM_KLASORU, "hata_kaydi.txt")
 WINDOWS = sys.platform.startswith("win")
 
 # ---- renkler (canli tema)
-R_MENU = "#312E81"            # indigo menu seridi
-R_MENU_SECILI = "#4338CA"
-R_MENU_YAZI = "#E0E7FF"
+R_MENU = "#FFFFFF"            # beyaz menu seridi
+R_MENU_SECILI = "#F3F4F6"
+R_MENU_YAZI = "#374151"
 R_LOGO = "#F97316"            # turuncu logo
 R_ARAC = "#FFFFFF"
-R_ARAC_UZERI = "#EEF2FF"
-R_MOD_SECILI = "#E0E7FF"
-R_SEKME = "#E0E7FF"
-R_ZEMIN = "#F5F7FF"
+R_ARAC_UZERI = "#F3F4F6"
+R_MOD_SECILI = "#E5E7EB"
+R_SEKME = "#F3F4F6"
+R_ZEMIN = "#FFFFFF"
 R_KART = "#FFFFFF"
 R_BASLIK = "#312E81"
 R_VURGU = "#4F46E5"
@@ -59,7 +60,7 @@ R_BASARI = "#059669"
 R_TEHLIKE = "#E11D48"
 R_YAZI = "#1E293B"
 R_SOLUK = "#64748B"
-R_CIZGI = "#D9DEF2"
+R_CIZGI = "#E5E7EB"
 # her menunun kendi rengi
 MENU_RENKLERI = {"Dosya": "#2563EB", "Giriş": "#7C3AED", "Sayfa": "#0891B2", "İşaretle": "#EAB308",
                  "İmza & Damga": "#DC2626", "Form": "#9333EA", "Dönüştür": "#16A34A", "Araçlar": "#EA580C",
@@ -226,6 +227,7 @@ class Uygulama(EkIslemler, _TemelTk):
         fontlar.baslat()
         self._mod_dugmeleri = {}
 
+        TK.kur(self)                       # tekerlek + touchpad yonlendirici
         self._menu_seridi()
         self._menu_seridi_alt = tk.Frame(self, bg=R_VURGU, height=3)
         self._menu_seridi_alt.pack(fill="x")
@@ -292,20 +294,20 @@ class Uygulama(EkIslemler, _TemelTk):
         s.configure("Ana.TButton", background=R_VURGU, foreground="white", font=(FONT, 10, "bold"),
                     padding=(14, 7), borderwidth=0, focuscolor=R_VURGU)
         s.map("Ana.TButton", background=[("active", "#6366F1"), ("pressed", R_VURGU_KOYU), ("disabled", "#A5B4FC")])
-        s.configure("Ikincil.TButton", background="#E0E7FF", foreground=R_BASLIK, padding=(8, 5), borderwidth=0,
-                    focuscolor="#E0E7FF")
-        s.map("Ikincil.TButton", background=[("active", "#C7D2FE"), ("pressed", "#A5B4FC")])
-        s.configure("TCombobox", fieldbackground="white", background="#E0E7FF", arrowcolor=R_VURGU)
-        s.configure("TSpinbox", arrowcolor=R_VURGU, background="#E0E7FF")
-        s.configure("TScale", background=R_ZEMIN, troughcolor="#C7D2FE")
-        s.configure("Alt.Horizontal.TScale", background="#FDE68A", troughcolor="#4338CA", bordercolor=R_MENU,
-                    lightcolor="#FDE68A", darkcolor="#F59E0B")
+        s.configure("Ikincil.TButton", background="#F3F4F6", foreground=R_YAZI, padding=(8, 5), borderwidth=0,
+                    focuscolor="#F3F4F6")
+        s.map("Ikincil.TButton", background=[("active", "#E5E7EB"), ("pressed", "#D1D5DB")])
+        s.configure("TCombobox", fieldbackground="white", background="#F3F4F6", arrowcolor=R_VURGU)
+        s.configure("TSpinbox", arrowcolor=R_VURGU, background="#F3F4F6")
+        s.configure("TScale", background=R_ZEMIN, troughcolor="#E5E7EB")
+        s.configure("Alt.Horizontal.TScale", background=R_LOGO, troughcolor="#E5E7EB", bordercolor="#E5E7EB",
+                    lightcolor=R_LOGO, darkcolor="#EA580C")
         s.configure("TEntry", padding=3)
-        s.configure("Horizontal.TProgressbar", background="#10B981", troughcolor="#E0E7FF", borderwidth=0)
+        s.configure("Horizontal.TProgressbar", background="#10B981", troughcolor="#E5E7EB", borderwidth=0)
         for yon in ("Vertical", "Horizontal"):
-            s.configure(f"Belge.{yon}.TScrollbar", gripcount=0, background="#A5B4FC", troughcolor="#EEF0FB",
-                        bordercolor="#EEF0FB", arrowcolor=R_VURGU, arrowsize=16, relief="flat")
-            s.map(f"Belge.{yon}.TScrollbar", background=[("pressed", R_VURGU), ("active", "#818CF8")])
+            s.configure(f"Belge.{yon}.TScrollbar", gripcount=0, background="#C4C7CC", troughcolor="#FFFFFF",
+                        bordercolor="#FFFFFF", arrowcolor="#6B7280", arrowsize=16, relief="flat")
+            s.map(f"Belge.{yon}.TScrollbar", background=[("pressed", "#6B7280"), ("active", "#9CA3AF")])
 
     # ---------------------------------------------------------- menu seridi
     MENULER = ["Dosya", "Giriş", "Sayfa", "İşaretle", "İmza & Damga", "Form", "Dönüştür", "Araçlar",
@@ -327,7 +329,7 @@ class Uygulama(EkIslemler, _TemelTk):
             e.bind("<Leave>", lambda ev, w=e, a=ad: w.config(fg="white" if a == self._secili_menu else R_MENU_YAZI,
                                                             bg=MENU_RENKLERI.get(a, R_VURGU) if a == self._secili_menu else R_MENU))
             self._menu_etiketleri[ad] = e
-        self.ocr_etiket = tk.Label(m, text="", bg=R_MENU, fg="#A5B4FC", font=(FONT, 9))
+        self.ocr_etiket = tk.Label(m, text="", bg=R_MENU, fg=R_SOLUK, font=(FONT, 9))
         self.ocr_etiket.pack(side="right", padx=10)
 
     def menu_sec(self, ad):
@@ -589,7 +591,7 @@ class Uygulama(EkIslemler, _TemelTk):
 
     # ---------------------------------------------------------- belge sekmeleri
     def _sekme_cubugu(self):
-        self._sekmeler = tk.Frame(self, bg=R_SEKME, height=34)
+        self._sekmeler = tk.Frame(self, bg="white", height=34)
         self._sekmeler.pack(fill="x")
         self._sekmeler.pack_propagate(False)
 
@@ -674,7 +676,7 @@ class Uygulama(EkIslemler, _TemelTk):
                     pass
 
     def _karsilama_olustur(self):
-        Z_ = "#F6F7FB"
+        Z_ = "#FFFFFF"
         k = tk.Frame(self.sag, bg=Z_)
         self._karsilama = k
         ust = tk.Frame(k, bg=Z_)
@@ -758,11 +760,11 @@ class Uygulama(EkIslemler, _TemelTk):
 
     # ---------------------------------------------------------- alt cubuk
     def _alt_dugme(self, ust, simge, komut, ipucu=None, boyut=11):
-        b = tk.Label(ust, text=simge, bg=R_MENU, fg="#FDE68A", font=(FONT, boyut, "bold"), padx=5, cursor="hand2")
+        b = tk.Label(ust, text=simge, bg=R_MENU, fg="#374151", font=(FONT, boyut, "bold"), padx=5, cursor="hand2")
         b.pack(side="left")
         b.bind("<Button-1>", lambda e: komut())
         b.bind("<Enter>", lambda e: b.config(bg=R_LOGO, fg="white"))
-        b.bind("<Leave>", lambda e: b.config(bg=R_MENU, fg="#FDE68A"))
+        b.bind("<Leave>", lambda e: b.config(bg=R_MENU, fg="#374151"))
         if ipucu:
             IpucuBalonu(b, ipucu)
         return b
@@ -785,13 +787,13 @@ class Uygulama(EkIslemler, _TemelTk):
         self._zoom_kaydirici.pack(side="left")
         self._zoom_kaydirici.bind("<ButtonRelease-1>", lambda e: self.belge and self.gorunum.zoom_ayarla(self._zoom_var.get() / 100))
         self._alt_dugme(z, "+", lambda: self.gorunum.zoom_adim(1), "Yakınlaş", 13)
-        self._zoom_etiket = tk.Label(z, text="", bg=R_MENU, fg="white", font=(FONT, 9, "bold"), width=5)
+        self._zoom_etiket = tk.Label(z, text="", bg=R_MENU, fg=R_YAZI, font=(FONT, 9, "bold"), width=5)
         self._zoom_etiket.pack(side="left")
 
         self.iptal_dugme = ttk.Button(a, text="✖ İptal", style="Ikincil.TButton", command=self._iptal)
         self.ilerleme = ttk.Progressbar(a, length=180, mode="determinate")
 
-        self.durum = tk.Label(a, text="Hazır.", bg=R_MENU, fg="#C7D2FE", font=(FONT, 9), anchor="w")
+        self.durum = tk.Label(a, text="Hazır.", bg=R_MENU, fg=R_SOLUK, font=(FONT, 9), anchor="w")
         self.durum.pack(side="left", padx=10, fill="x", expand=True)
 
         g = tk.Frame(a, bg=R_MENU)
@@ -802,14 +804,14 @@ class Uygulama(EkIslemler, _TemelTk):
         e = ttk.Entry(g, textvariable=self._sayfa_var, width=5, justify="center")
         e.pack(side="left", padx=4)
         e.bind("<Return>", self._sayfa_girildi)
-        self._toplam_etiket = tk.Label(g, text="/ 0", bg=R_MENU, fg="white", font=(FONT, 9))
+        self._toplam_etiket = tk.Label(g, text="/ 0", bg=R_MENU, fg=R_YAZI, font=(FONT, 9))
         self._toplam_etiket.pack(side="left")
         self._alt_dugme(g, "▶", lambda: self.git_adim(1), "Sonraki sayfa (Page Down)")
         self._alt_dugme(g, "⏭", lambda: self.git(10 ** 6), "Son sayfa")
         g.lift()
 
     def durum_yaz(self, metin, hata=False, basari=False):
-        self.durum.config(text=metin, fg="#FDA4AF" if hata else ("#6EE7B7" if basari else "#E0E7FF"))
+        self.durum.config(text=metin, fg=R_TEHLIKE if hata else (R_BASARI if basari else R_SOLUK))
 
     def zoom_guncelle(self):
         z = self.gorunum.olcek / PT_PX * 100
@@ -2105,7 +2107,7 @@ class Uygulama(EkIslemler, _TemelTk):
                 elif m[0] == "ocr":
                     self._ocr_hazir = m[1]
                     self.ocr_etiket.config(text=("✔ " if m[1] else "⚠ ") + m[2],
-                                           fg="#6EE7B7" if m[1] else "#FDA4AF")
+                                           fg=R_BASARI if m[1] else R_TEHLIKE)
         except queue.Empty:
             pass
         self.after(100, self._kuyruk_isle)

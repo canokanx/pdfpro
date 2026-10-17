@@ -142,7 +142,7 @@ class Vitrin(tk.Frame):
     KART_G = 268
     KART_Y = 132
 
-    def __init__(self, ust, u, font="Segoe UI", emoji_font="Segoe UI Emoji", zemin="#F6F7FB"):
+    def __init__(self, ust, u, font="Segoe UI", emoji_font="Segoe UI Emoji", zemin="#FFFFFF"):
         super().__init__(ust, bg=zemin)
         self.u, self.F, self.E, self.Z = u, font, emoji_font, zemin
         self.kategori = "Tümü"
@@ -155,7 +155,7 @@ class Vitrin(tk.Frame):
         self._cip_ciz()
         govde = tk.Frame(self, bg=zemin)
         govde.pack(fill="both", expand=True)
-        self.tuval = tk.Canvas(govde, bg=zemin, highlightthickness=0)
+        self.tuval = tk.Canvas(govde, bg=zemin, highlightthickness=0, yscrollincrement=24)
         from tkinter import ttk
         sb = ttk.Scrollbar(govde, orient="vertical", command=self.tuval.yview, style="Belge.Vertical.TScrollbar")
         self.tuval.configure(yscrollcommand=sb.set)
@@ -165,10 +165,8 @@ class Vitrin(tk.Frame):
         self._pencere = self.tuval.create_window(0, 0, window=self.ic, anchor="n")
         self.ic.bind("<Configure>", lambda e: self.tuval.configure(scrollregion=self.tuval.bbox("all")))
         self.tuval.bind("<Configure>", self._boyut)
-        for w in (self.tuval, self.ic):
-            w.bind("<MouseWheel>", self._teker)
-            w.bind("<Button-4>", lambda e: self.tuval.yview_scroll(-2, "units"))
-            w.bind("<Button-5>", lambda e: self.tuval.yview_scroll(2, "units"))
+        from . import teker as TK
+        TK.kaydet(self.tuval, TK.canvas_kaydirici(self.tuval))
 
     def _teker(self, e):
         self.tuval.yview_scroll(int(-e.delta / 40) or (-1 if e.delta > 0 else 1), "units")
@@ -248,6 +246,3 @@ class Vitrin(tk.Frame):
             w.bind("<Button-1>", tikla)
             w.bind("<Enter>", uzerinde)
             w.bind("<Leave>", ayrildi)
-            w.bind("<MouseWheel>", self._teker)
-            w.bind("<Button-4>", lambda e: self.tuval.yview_scroll(-2, "units"))
-            w.bind("<Button-5>", lambda e: self.tuval.yview_scroll(2, "units"))
