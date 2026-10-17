@@ -13,6 +13,7 @@ PROGRAM_KLASORU = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 YEREL_TESSDATA = os.path.join(PROGRAM_KLASORU, "tessdata")
 
 _TESS_ADAYLARI = [
+    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tesseract", "tesseract.exe"),
     os.path.join(PROGRAM_KLASORU, "Tesseract-OCR", "tesseract.exe"),
     r"C:\Program Files\Tesseract-OCR\tesseract.exe",
     r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
@@ -22,7 +23,9 @@ _TESS_ADAYLARI = [
 
 
 def tesseract_bul():
-    """tesseract calistirilabilir yolunu dondurur, yoksa None."""
+    """tesseract calistirilabilir yolunu dondurur, yoksa None. Kurulumla gelen (program klasorundeki) once."""
+    if os.path.isfile(_TESS_ADAYLARI[0]):
+        return _TESS_ADAYLARI[0]
     yol = shutil.which("tesseract")
     if yol:
         return yol

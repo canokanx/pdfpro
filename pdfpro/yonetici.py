@@ -288,11 +288,33 @@ def sonraki_surum(s):
 
 
 # ================================================================== ARAYUZ
+TASIMA_TURU = "PDFPRO-YONETICI"
+
+
+def disa_aktar(veri, yol):
+    """Yonetici ayarlarini (kimlik, sifreli kasa: GitHub tokeni + imza anahtari, depo, son yayin) dosyaya yazar.
+    Kasa zaten yonetici sifresiyle sifreli oldugu icin dosya sifre olmadan acilamaz."""
+    paket = {"tur": TASIMA_TURU, "surum": 1, "tarih": datetime.datetime.now().isoformat(timespec="seconds"),
+             "veri": {k: v for k, v in veri.d.items() if k in ("kimlik", "kasa", "repo", "son_manifest")}}
+    with open(yol, "w", encoding="utf-8") as f:
+        json.dump(paket, f, ensure_ascii=False)
+    return yol
+
+
+def tasima_dosyasi_oku(yol):
+    with open(yol, encoding="utf-8") as f:
+        p = json.load(f)
+    if p.get("tur") != TASIMA_TURU or not p.get("veri", {}).get("kimlik"):
+        raise ValueError("Bu dosya bir PDF PRO yönetici dosyası değil.")
+    return p["veri"]
+
+
 class GirisPenceresi(tk.Toplevel):
-    def __init__(self, u, veri, ilk=False):
+    def __init__(self, u, veri, ilk=False, aktar=False):
         super().__init__(u)
         from .diyaloglar import baslik_rengi
         self.u, self.veri, self.ilk, self.sonuc = u, veri, ilk, None
+        self._aktarildi = False
         self.title("Yönetici Girişi")
         self.configure(bg="white")
         self.transient(u)
@@ -314,15 +336,25 @@ class GirisPenceresi(tk.Toplevel):
         self.s = ttk.Entry(g, width=28, show="•")
         self.s.grid(row=2, column=1, pady=4)
         if ilk:
-            tk.Label(g, text="Şifre (tekrar):", bg="white", font=(u_font(), 10)).grid(row=3, column=0, sticky="w", pady=4)
+            self._s2_etiket = tk.Label(g, text="Şifre (tekrar):", bg="white", font=(u_font(), 10))
+            self._s2_etiket.grid(row=3, column=0, sticky="w", pady=4)
             self.s2 = ttk.Entry(g, width=28, show="•")
             self.s2.grid(row=3, column=1, pady=4)
+        self._ust_bilgi = g.grid_slaves(row=0, column=0)[0] if (ilk and g.grid_slaves(row=0, column=0)) else None
+        self._bant_yazi = bant.winfo_children()[0]
+        if ilk and aktar:
+            ak = tk.Label(g, text="📥 Başka bilgisayardaki yönetici ayarlarımı aktar", bg="white", fg="#4F46E5",
+                          cursor="hand2", font=(u_font(), 9, "underline"))
+            ak.grid(row=5, column=0, columnspan=2, sticky="w", pady=(8, 0))
+            ak.bind("<Button-1>", lambda e: self._aktar())
+            self._ak = ak
         self.hata = tk.Label(g, text="", bg="white", fg="#E11D48", font=(u_font(), 9))
         self.hata.grid(row=4, column=0, columnspan=2, sticky="w")
         d = tk.Frame(self, bg="white", padx=22, pady=12)
         d.pack(fill="x")
         ttk.Button(d, text="Vazgeç", style="Ikincil.TButton", command=self.destroy).pack(side="right")
-        ttk.Button(d, text="Giriş" if not ilk else "Oluştur", style="Ana.TButton", command=self._tamam).pack(side="right", padx=8)
+        self._ana_dugme = ttk.Button(d, text="Giriş" if not ilk else "Oluştur", style="Ana.TButton", command=self._tamam)
+        self._ana_dugme.pack(side="right", padx=8)
         self.bind("<Return>", lambda e: self._tamam())
         self.bind("<Escape>", lambda e: self.destroy())
         self._deneme = 0
@@ -330,6 +362,27 @@ class GirisPenceresi(tk.Toplevel):
         x = u.winfo_rootx() + (u.winfo_width() - self.winfo_width()) // 2
         y = u.winfo_rooty() + (u.winfo_height() - self.winfo_height()) // 3
         self.geometry(f"+{max(0, x)}+{max(0, y)}")
+        self.k.focus_set()
+
+    def _aktar(self):
+        y = filedialog.askopenfilename(parent=self, title="Yönetici ayar dosyasını seçin",
+                                       filetypes=[("PDF PRO yönetici", "*.pdfproyonetici"), ("Tüm dosyalar", "*.*")])
+        if not y:
+            return
+        try:
+            d = tasima_dosyasi_oku(y)
+        except Exception as e:
+            self.hata.config(text=str(e)[:120])
+            return
+        self.veri.d = d
+        self._aktarildi = True
+        self.ilk = False
+        for w in (getattr(self, "s2", None), getattr(self, "_s2_etiket", None), self._ust_bilgi, getattr(self, "_ak", None)):
+            if w is not None:
+                w.grid_remove()
+        self._bant_yazi.config(text="🛡  Aktarılan hesapla giriş")
+        self._ana_dugme.config(text="Giriş")
+        self.hata.config(text="Dosya okundu. O hesabın kullanıcı adı ve şifresini girin.", fg="#059669")
         self.k.focus_set()
 
     def _tamam(self):
@@ -349,12 +402,19 @@ class GirisPenceresi(tk.Toplevel):
         self.hata.config(text="Kontrol ediliyor…")
         self.update_idletasks()
         if self.veri.dogrula(k, s):
+            if self._aktarildi:
+                try:
+                    kasa_ac(s, self.veri.d.get("kasa"))
+                except Exception:
+                    self.hata.config(text="Dosyadaki gizli bilgiler bu şifreyle açılamadı.", fg="#E11D48")
+                    return
+                self.veri.kaydet()          # aktarilan ayarlar bu bilgisayara yazilir
             self.sonuc = (k, s)
             self.destroy()
             return
         self._deneme += 1
         self.s.delete(0, "end")
-        self.hata.config(text="Kullanıcı adı veya şifre yanlış.")
+        self.hata.config(text="Kullanıcı adı veya şifre yanlış.", fg="#E11D48")
         if self._deneme >= 5:
             self.after(200, self.destroy)
 
@@ -647,10 +707,18 @@ class YoneticiPaneli(tk.Toplevel):
         ttk.Button(d, text="🗄 Arşiv klasörü", style="Ikincil.TButton",
                    command=lambda: (os.makedirs(ARSIV, exist_ok=True), _ac(ARSIV))).pack(side="left", padx=6)
         tk.Frame(f, bg="#E2E8F0", height=1).pack(fill="x", pady=14)
-        self._etiket(f, "Yeni kullanıcı için kurulum paketi", kalin=True).pack(anchor="w")
-        self._etiket(f, "Tek bir zip dosyası hazırlar. Yeni bilgisayarda zip'i açıp KURULUM.bat'ı çalıştırmak yeterli;\n"
-                        "o bilgisayar da bundan sonra otomatik güncellenir.", soluk=True).pack(anchor="w", pady=(2, 8))
-        ttk.Button(f, text="📦 Kurulum paketi oluştur", style="Ana.TButton", command=self._kurulum_paketi).pack(anchor="w")
+        self._etiket(f, "Kurulum dosyası (setup .exe) — karşı tarafa gönderilecek tek dosya", kalin=True).pack(anchor="w")
+        self._etiket(f, "Python, kütüphaneler, OCR motoru ve yazı tipleri içinde; karşı bilgisayarda internet ya da\n"
+                        "ek kurulum gerekmez. Kurulan bilgisayar bundan sonra otomatik güncellenir. (Hazırlama 1-3 dk)",
+                     soluk=True).pack(anchor="w", pady=(2, 8))
+        self.github_yukle = tk.BooleanVar(value=bool(self.repo() and self.token()))
+        ttk.Checkbutton(f, text="GitHub'a da yükle (herkes aynı linkten indirebilsin)", variable=self.github_yukle).pack(anchor="w")
+        k = tk.Frame(f, bg="white")
+        k.pack(anchor="w", pady=(6, 0))
+        ttk.Button(k, text="🧩 Kurulum dosyası oluştur (.exe)", style="Ana.TButton", command=self._kurulum_exe).pack(side="left")
+        ttk.Button(k, text="⬇ İndir", style="Ikincil.TButton", command=self._kurulum_indir).pack(side="left", padx=6)
+        ttk.Button(k, text="🔗 İndirme linkini kopyala", style="Ikincil.TButton", command=self._link_kopyala).pack(side="left")
+        ttk.Button(k, text="📦 Eski usul zip paketi", style="Ikincil.TButton", command=self._kurulum_paketi).pack(side="left", padx=6)
         tk.Frame(f, bg="#E2E8F0", height=1).pack(fill="x", pady=14)
         self._etiket(f, "Pakete GİRMEYENLER (kişisel): ayarlar.json (yapay zeka anahtarı dahil), yedekler, hata kaydı, "
                         "önbellekler.", soluk=True).pack(anchor="w")
@@ -660,6 +728,53 @@ class YoneticiPaneli(tk.Toplevel):
         hedef = os.path.join(ARSIV, f"kaynak_{SURUM}_{datetime.datetime.now():%Y%m%d_%H%M}.zip")
         self._arka("Kaynak yedeği alınıyor", lambda il, ip: paket_zip(hedef, None, il),
                    lambda r: self.u.sonuc_goster("Kaynak yedeği alındı.", r))
+
+    def _kurulum_exe(self):
+        from . import kurulum_olustur as KO
+        masaustu = os.path.join(os.path.expanduser("~"), "Desktop")
+        y = filedialog.asksaveasfilename(parent=self, initialdir=masaustu, initialfile=f"PDF_PRO_Kurulum_{SURUM}.exe",
+                                         defaultextension=".exe", filetypes=[("Kurulum dosyası", "*.exe")])
+        if not y:
+            return
+        y = os.path.normpath(y)
+        yukle = self.github_yukle.get() and self.repo() and self.token()
+        repo, token = self.repo(), self.token()
+
+        def is_(il, ip):
+            hedef, boyut, notlar = KO.olustur(y, il, ip)
+            link = None
+            if yukle:
+                il(99, 100, "GitHub'a yükleniyor (birkaç dakika sürebilir)")
+                link = KO.github_yukle(repo, token, hedef, SURUM)
+            return hedef, boyut, notlar, link
+
+        def bitti(r):
+            hedef, boyut, notlar, link = r
+            m = f"Kurulum dosyası hazır ({boyut / 1048576:.0f} MB)."
+            if link:
+                m += f"\n\nİndirme linki (panoya kopyalandı):\n{link}"
+                self.clipboard_clear()
+                self.clipboard_append(link)
+            self.u.sonuc_goster(m, hedef, uyari="\n".join(notlar) if notlar else None)
+        self._arka("Kurulum dosyası hazırlanıyor", is_, bitti)
+
+    def _kurulum_indir(self):
+        from . import kurulum_olustur as KO
+        if not self.repo():
+            messagebox.showinfo("PDF PRO", "Önce Ayarlar'dan GitHub deposunu girin.", parent=self)
+            return
+        webbrowser.open(KO.indirme_linki(self.repo()))
+
+    def _link_kopyala(self):
+        from . import kurulum_olustur as KO
+        if not self.repo():
+            messagebox.showinfo("PDF PRO", "Önce Ayarlar'dan GitHub deposunu girin.", parent=self)
+            return
+        link = KO.indirme_linki(self.repo())
+        self.clipboard_clear()
+        self.clipboard_append(link)
+        messagebox.showinfo("PDF PRO", f"Link panoya kopyalandı:\n\n{link}\n\nE-posta veya WhatsApp ile gönderebilirsiniz. "
+                                       "Link, en son 'GitHub'a da yükle' ile oluşturulan kurulum dosyasını indirir.", parent=self)
 
     def _kurulum_paketi(self):
         if not GN.ayar_oku().get("repo"):
@@ -712,7 +827,11 @@ class YoneticiPaneli(tk.Toplevel):
         ttk.Button(f, text="🔐 İmza anahtarı oluştur", style="Ikincil.TButton", command=self._anahtar_olustur).pack(anchor="w")
         tk.Frame(f, bg="#E2E8F0", height=1).pack(fill="x", pady=12)
         self._etiket(f, "Yönetici hesabı", kalin=True).pack(anchor="w")
-        ttk.Button(f, text="🔑 Şifre / kullanıcı adı değiştir", style="Ikincil.TButton", command=self._sifre_degistir).pack(anchor="w", pady=4)
+        sat = tk.Frame(f, bg="white")
+        sat.pack(anchor="w", pady=4)
+        ttk.Button(sat, text="🔑 Şifre / kullanıcı adı değiştir", style="Ikincil.TButton", command=self._sifre_degistir).pack(side="left")
+        ttk.Button(sat, text="📤 Başka bilgisayara taşı (dışa aktar)", style="Ikincil.TButton",
+                   command=self._disa_aktar).pack(side="left", padx=6)
         self._imza_durumu()
 
     def _imza_durumu(self):
@@ -788,6 +907,25 @@ class YoneticiPaneli(tk.Toplevel):
         self._durum_guncelle()
         messagebox.showinfo("PDF PRO", "İmza anahtarı oluşturuldu ve şifreli olarak saklandı.", parent=self)
 
+    def _disa_aktar(self):
+        if not (self.repo() and self.token() and self.gizli_anahtar()):
+            if not messagebox.askyesno("PDF PRO", "GitHub ayarları veya imza anahtarı eksik. Yine de dışa aktarılsın mı?",
+                                       parent=self):
+                return
+        self._kasa_kaydet()
+        masaustu = os.path.join(os.path.expanduser("~"), "Desktop")
+        y = filedialog.asksaveasfilename(parent=self, initialdir=masaustu, initialfile="PDF_PRO_yonetici.pdfproyonetici",
+                                         defaultextension=".pdfproyonetici",
+                                         filetypes=[("PDF PRO yönetici", "*.pdfproyonetici")])
+        if not y:
+            return
+        disa_aktar(self.veri, os.path.normpath(y))
+        messagebox.showinfo("PDF PRO", "Yönetici ayarları dışa aktarıldı:\n" + os.path.normpath(y) + "\n\n"
+                            "Yeni bilgisayarda: PDF PRO → Yardım → Yönetici → '📥 Başka bilgisayardaki yönetici "
+                            "ayarlarımı aktar' → bu dosyayı seçin → kullanıcı adı ve şifrenizle giriş yapın.\n\n"
+                            "Dosyadaki GitHub tokeni ve imza anahtarı yönetici şifrenizle şifrelidir. Yine de dosyayı "
+                            "USB ile taşıyın, kimseyle paylaşmayın ve aktardıktan sonra silin.", parent=self)
+
     def _sifre_degistir(self):
         p = GirisPenceresi(self.u, self.veri, ilk=True)
         p.title("Şifre değiştir")
@@ -815,7 +953,7 @@ def _ac(yol):
 def paneli_ac(u):
     veri = Veri()
     ilk = veri.kimlik() is None
-    s = GirisPenceresi(u, veri, ilk=ilk).ac()
+    s = GirisPenceresi(u, veri, ilk=ilk, aktar=ilk).ac()
     if not s:
         return None
     return YoneticiPaneli(u, s[0], s[1], veri)

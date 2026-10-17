@@ -40,7 +40,7 @@ HARIC_KLASOR = {"__pycache__", "yedekler", "Claude outputs", "guncelleme_bekleye
                 ".idea", ".vscode", "cikti"}
 HARIC_DOSYA = {"ayarlar.json", "fontlar_onbellek.json", "hata_kaydi.txt", "python_yolu.txt", "gomulu_ok.txt",
                "gomulu_deneme.txt", "guncelleme_deneme.json", "guncelleme_durum.json",
-               "son_test_sonucu.txt"}
+               "son_test_sonucu.txt", "windows_kayit_kapali.txt"}
 HARIC_UZANTI = (".pyc", ".pyo", ".old", ".tmp", ".pdfpro_tmp", ".log")
 
 

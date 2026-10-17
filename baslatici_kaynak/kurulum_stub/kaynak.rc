@@ -1,0 +1,27 @@
+#include <winver.h>
+1 ICON "simge.ico"
+1 VERSIONINFO
+FILEVERSION 4,0,0,0
+PRODUCTVERSION 4,0,0,0
+FILEOS VOS_NT_WINDOWS32
+FILETYPE VFT_APP
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904B0"
+    BEGIN
+      VALUE "CompanyName", "IRONHULL"
+      VALUE "FileDescription", "PDF PRO Kurulum"
+      VALUE "FileVersion", "4.0.0.0"
+      VALUE "ProductName", "PDF PRO"
+      VALUE "ProductVersion", "4.0.0.0"
+      VALUE "OriginalFilename", "PDF_PRO_Kurulum.exe"
+      VALUE "LegalCopyright", "IRONHULL - Can Okan AKTAS"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x0409, 1200
+  END
+END
+1 24 "manifest.xml"

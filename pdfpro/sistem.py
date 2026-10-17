@@ -199,6 +199,8 @@ def kisayol_guncelle():
 
 def gerekiyorsa_kaydet():
     kisayol_guncelle()
+    if os.path.isfile(os.path.join(PROGRAM_KLASORU, "windows_kayit_kapali.txt")):
+        return          # kurulumda "PDF PRO ile ac" istenmedi
     try:
         if WINDOWS:
             python_yolunu_yaz()

@@ -2383,7 +2383,8 @@ Ekran düzeni
 ■ Güncellemeler ve Yönetici
 • PDF PRO açılışta yeni sürüm olup olmadığına bakar. Varsa sadece değişen dosyaları arka planda indirir; üst çubukta turuncu "⬆ … hazır · Güncelle" çıkar. Tıklarsanız hemen, tıklamazsanız bir sonraki açılışta güncellenir.
 • Her güncelleme yöneticinin imzasını taşır; imza tutmazsa yüklenmez. Yeni sürüm açılamazsa program kendiliğinden önceki sürüme döner.
-• Yardım → 🛡 Yönetici: kullanıcı adı ve şifreyle girilir. Yeni sürüm yayınlama, sürüm geçmişi, kaynak arşivi ve yeni bilgisayar için kurulum paketi buradadır.
+• Yardım → 🛡 Yönetici: kullanıcı adı ve şifreyle girilir. Yeni sürüm yayınlama, sürüm geçmişi, kaynak arşivi ve yeni bilgisayar için kurulum dosyası buradadır.
+• Kurulum dosyası (PDF_PRO_Kurulum.exe): Yönetici → Kaynak Dosyalar → "Kurulum dosyası oluştur". Tek dosya; Python, kütüphaneler ve OCR içinde. Karşı taraf çift tıklayıp sihirbazı izler. "GitHub'a da yükle" seçilirse herkes aynı linkten indirebilir.
 
 ■ Dosya menüsü (yeni)
 • 📠 Tara: Tarayıcıdan sayfa sayfa tarar, tek PDF yapar (isterseniz otomatik OCR).
