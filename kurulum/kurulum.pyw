@@ -358,7 +358,7 @@ def sihirbaz(kaynak):
         "yol": tk.StringVar(value=onceki[0] if onceki else herkes_vars),
         "ocr": tk.BooleanVar(value=os.path.isdir(os.path.join(kaynak, "tesseract"))),
         "masaustu": tk.BooleanVar(value=True), "baslat": tk.BooleanVar(value=True),
-        "birlikte_ac": tk.BooleanVar(value=True), "varsayilan": tk.BooleanVar(value=False),
+        "birlikte_ac": tk.BooleanVar(value=True), "varsayilan": tk.BooleanVar(value=True),
         "guncelleme": tk.BooleanVar(value=True), "baslat_simdi": tk.BooleanVar(value=True),
         "kilavuz": tk.BooleanVar(value=False),
     }
