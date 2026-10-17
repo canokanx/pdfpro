@@ -5,6 +5,13 @@ import sys
 
 KLASOR = os.path.dirname(os.path.abspath(__file__))
 
+# Dosya Gezgini onizleme eklentisi (onizleme.dll) sayfa resmi istiyor: pencere acmadan ciz ve cik
+if len(sys.argv) > 1 and sys.argv[1] == "--onizle":
+    os.environ.pop("PDFPRO_GOMULU", None)
+    sys.path.insert(0, KLASOR)
+    from pdfpro import onizleme
+    sys.exit(onizleme.main(sys.argv[2:]))
+
 # PDF_PRO.exe Python'u kendi icinde calistirdiysa (Gorev Yoneticisi'nde "PDF PRO" gorunsun diye):
 # sys.executable gercek pythonw'yu gostersin (pip kurulumu vb. icin)
 if os.environ.pop("PDFPRO_GOMULU", "") == "1":

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """PDF PRO surum numarasi. Yonetici 'Yayinla' dediginde otomatik artirilir."""
-SURUM = "4.0.4"
+SURUM = "4.0.5"
 
 
 def surum_tuple(s):

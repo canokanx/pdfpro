@@ -540,7 +540,8 @@ class Uygulama(EkIslemler, _TemelTk):
             ]
         return [[("🛡", "Yönetici", self.yonetici_ac, "Yönetici girişi: güncelleme yayınlama, sürümler, kaynak dosyalar"),
                  ("🪟", "Windows'a Tanıt", self.windows_tanit,
-                  "PDF'e sağ tıklayınca 'Birlikte aç' listesinde ve 'PDF PRO ile aç' olarak görünsün; varsayılan yapılabilsin")],
+                  "PDF'e sağ tıklayınca 'Birlikte aç' listesinde ve 'PDF PRO ile aç' olarak görünsün; varsayılan yapılabilsin; "
+                  "klasörlerde PDF'lerin ilk sayfası önizleme olarak görünsün")],
                 [("❓", "Kılavuz", self.kilavuz, "F1"), ("ℹ", "Hakkında", self.hakkinda),
                  ("🧾", "Hata Kaydı", self.hata_kaydi_ac)]]
 
@@ -2193,7 +2194,9 @@ class Uygulama(EkIslemler, _TemelTk):
             return
         if messagebox.askyesno("PDF PRO", "PDF PRO Windows'a tanıtıldı.\n\n"
                                           "• PDF'e sağ tık → 'Birlikte aç' listesinde PDF PRO var\n"
-                                          "• Sağ tık menüsünde 'PDF PRO ile aç' var (Windows 11'de 'Diğer seçenekleri göster')\n\n"
+                                          "• Sağ tık menüsünde 'PDF PRO ile aç' var (Windows 11'de 'Diğer seçenekleri göster')\n"
+                                          "• Klasörlerde PDF simgesi yerine ilk sayfa görünür; Dosya Gezgini'nde Alt+P ile "
+                                          "sağda önizleme açılır\n\n"
                                           "PDF'lere ÇİFT TIKLAYINCA da PDF PRO açılsın mı?\n"
                                           "(Evet derseniz Windows ayarları açılır; orada PDF PRO'yu seçin.)"):
             sistem.varsayilan_ayarlari_ac()

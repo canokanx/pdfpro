@@ -78,6 +78,15 @@ def kaldir():
         _sil_agac(winreg, hk, rf"{c}\SystemFileAssociations\{uz}\shell\PDFPRO")
         _deger_sil(winreg, hk, rf"{c}\{uz}\OpenWithProgids", "PDFPRO.Belge")
     _deger_sil(winreg, hk, r"Software\RegisteredApplications", "PDF PRO")
+    # Dosya Gezgini onizlemesi (kucuk resim + onizleme bolmesi)
+    for clsid in ("{4F2266AF-4870-4AD7-B002-F50753535A14}", "{099B1E91-513E-4084-9351-358406A52166}"):
+        _sil_agac(winreg, hk, rf"{c}\CLSID\{clsid}")
+    for yol in (rf"{c}\.pdf", rf"{c}\SystemFileAssociations\.pdf"):
+        for ex in ("{e357fccd-a995-4576-b01f-234630154e96}", "{8895b1c6-b41f-4c1c-a562-0d564250836f}"):
+            _sil_agac(winreg, hk, rf"{yol}\ShellEx\{ex}")
+    _deger_sil(winreg, hk, r"Software\Microsoft\Windows\CurrentVersion\PreviewHandlers",
+               "{099B1E91-513E-4084-9351-358406A52166}")
+    _sil_agac(winreg, hk, r"Software\IRONHULL\PDFPRO")
     try:
         ctypes.windll.shell32.SHChangeNotify(0x08000000, 0, None, None)
     except Exception:

@@ -110,6 +110,118 @@ def kayitli_mi():
             and _oku(winreg, rf"Software\Classes\{PROGID}", "PDFPRO_KayitSurum") == KAYIT_SURUM)
 
 
+# ------------------------------------------------------------------ Dosya Gezgini onizlemesi
+ONIZLEME_KUCUK = "{4F2266AF-4870-4AD7-B002-F50753535A14}"     # kucuk resim (simge yerine ilk sayfa)
+ONIZLEME_BOLME = "{099B1E91-513E-4084-9351-358406A52166}"     # onizleme bolmesi (Alt+P)
+SHELLEX_KUCUK = "{e357fccd-a995-4576-b01f-234630154e96}"
+SHELLEX_BOLME = "{8895b1c6-b41f-4c1c-a562-0d564250836f}"
+PREVHOST_APPID = "{6d2b5079-2f0b-48dd-ab7f-97cec514d30b}"
+
+
+def _onizleme_dll_hedefi():
+    import hashlib
+    kaynak = os.path.join(PROGRAM_KLASORU, "onizleme.dll")
+    if not os.path.isfile(kaynak):
+        return None
+    with open(kaynak, "rb") as f:
+        ozet = hashlib.md5(f.read()).hexdigest()[:10]
+    hedef_klasor = os.path.join(os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"), "PDFPRO")
+    return os.path.join(hedef_klasor, f"onizleme_{ozet}.dll")
+
+
+def _onizleme_dll_kopyasi():
+    """onizleme.dll Explorer tarafindan kilitlenir; guncellemeler takilmasin diye
+    %LOCALAPPDATA%/PDFPRO altina icerigine gore adlandirilmis bir kopyasi kaydedilir."""
+    import shutil
+    kaynak = os.path.join(PROGRAM_KLASORU, "onizleme.dll")
+    hedef = _onizleme_dll_hedefi()
+    if not hedef:
+        return None
+    hedef_klasor = os.path.dirname(hedef)
+    os.makedirs(hedef_klasor, exist_ok=True)
+    if not os.path.isfile(hedef):
+        shutil.copyfile(kaynak, hedef)
+        for ad in os.listdir(hedef_klasor):        # eski kopyalar (kullanimda degilse) silinsin
+            if ad.startswith("onizleme_") and ad.endswith(".dll") and ad != os.path.basename(hedef):
+                try:
+                    os.remove(os.path.join(hedef_klasor, ad))
+                except OSError:
+                    pass
+    return hedef
+
+
+def _onizleme_ilisikleri():
+    c = r"Software\Classes"
+    return [rf"{c}\.pdf", rf"{c}\{PROGID}", rf"{c}\SystemFileAssociations\.pdf", rf"{c}\Applications\PDF_PRO.exe"]
+
+
+def onizleme_kayitli_mi():
+    if not WINDOWS:
+        return True
+    import winreg
+    beklenen = _onizleme_dll_hedefi()
+    if not beklenen:
+        return True               # bu kurulumda onizleme.dll yok
+    dll = _oku(winreg, rf"Software\Classes\CLSID\{ONIZLEME_KUCUK}\InprocServer32")
+    return (bool(dll) and os.path.normcase(dll) == os.path.normcase(beklenen) and os.path.isfile(dll)
+            and _oku(winreg, rf"Software\Classes\CLSID\{ONIZLEME_BOLME}\InprocServer32") == dll
+            and _oku(winreg, r"Software\IRONHULL\PDFPRO", "Program") == PROGRAM_KLASORU
+            and _oku(winreg, rf"Software\Classes\{PROGID}\ShellEx\{SHELLEX_KUCUK}") == ONIZLEME_KUCUK)
+
+
+def onizleme_kaydet():
+    """Dosya Gezgini'nde PDF simgesi yerine ilk sayfa + onizleme bolmesinde sayfalar."""
+    if not WINDOWS:
+        return False
+    import winreg
+    dll = _onizleme_dll_kopyasi()
+    if not dll:
+        return False
+    _yaz(winreg, r"Software\IRONHULL\PDFPRO", PROGRAM_KLASORU, "Program")
+    c = r"Software\Classes\CLSID"
+    _yaz(winreg, rf"{c}\{ONIZLEME_KUCUK}", "PDF PRO Küçük Resim")
+    _yaz(winreg, rf"{c}\{ONIZLEME_KUCUK}\InprocServer32", dll)
+    _yaz(winreg, rf"{c}\{ONIZLEME_KUCUK}\InprocServer32", "Apartment", "ThreadingModel")
+    _yaz(winreg, rf"{c}\{ONIZLEME_BOLME}", "PDF PRO Önizleme")
+    _yaz(winreg, rf"{c}\{ONIZLEME_BOLME}", "PDF PRO Önizleme", "DisplayName")
+    _yaz(winreg, rf"{c}\{ONIZLEME_BOLME}", PREVHOST_APPID, "AppID")
+    _yaz(winreg, rf"{c}\{ONIZLEME_BOLME}\InprocServer32", dll)
+    _yaz(winreg, rf"{c}\{ONIZLEME_BOLME}\InprocServer32", "Apartment", "ThreadingModel")
+    _yaz(winreg, r"Software\Microsoft\Windows\CurrentVersion\PreviewHandlers", "PDF PRO Önizleme", ONIZLEME_BOLME)
+    for yol in _onizleme_ilisikleri():
+        _yaz(winreg, rf"{yol}\ShellEx\{SHELLEX_KUCUK}", ONIZLEME_KUCUK)
+        _yaz(winreg, rf"{yol}\ShellEx\{SHELLEX_BOLME}", ONIZLEME_BOLME)
+    try:
+        import ctypes
+        ctypes.windll.shell32.SHChangeNotify(0x08000000, 0, None, None)   # SHCNE_ASSOCCHANGED
+    except Exception:
+        pass
+    return True
+
+
+def onizleme_kaldir():
+    if not WINDOWS:
+        return
+    import winreg
+    for yol in _onizleme_ilisikleri():
+        _sil(winreg, rf"{yol}\ShellEx\{SHELLEX_KUCUK}")
+        _sil(winreg, rf"{yol}\ShellEx\{SHELLEX_BOLME}")
+    _sil(winreg, rf"Software\Classes\CLSID\{ONIZLEME_KUCUK}")
+    _sil(winreg, rf"Software\Classes\CLSID\{ONIZLEME_BOLME}")
+    try:
+        k = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\PreviewHandlers",
+                           0, winreg.KEY_SET_VALUE)
+        winreg.DeleteValue(k, ONIZLEME_BOLME)
+        winreg.CloseKey(k)
+    except OSError:
+        pass
+    try:
+        import ctypes
+        ctypes.windll.shell32.SHChangeNotify(0x08000000, 0, None, None)
+    except Exception:
+        pass
+
+
 def kaydet():
     """Windows'a PDF PRO'yu tanitir. Dondurur: True/False."""
     if not WINDOWS:
@@ -163,6 +275,10 @@ def kaydet():
         _yaz(winreg, rf"{cap}\FileAssociations", PROGID, uz)
     _yaz(winreg, r"Software\RegisteredApplications", cap, "PDF PRO")
     try:
+        onizleme_kaydet()
+    except Exception:
+        pass
+    try:
         import ctypes
         ctypes.windll.shell32.SHChangeNotify(0x08000000, 0, None, None)   # SHCNE_ASSOCCHANGED
     except Exception:
@@ -199,6 +315,12 @@ def kisayol_guncelle():
 
 def gerekiyorsa_kaydet():
     kisayol_guncelle()
+    try:
+        if WINDOWS and not os.path.isfile(os.path.join(PROGRAM_KLASORU, "onizleme_kapali.txt")) \
+                and not onizleme_kayitli_mi():
+            onizleme_kaydet()
+    except Exception:
+        pass
     if os.path.isfile(os.path.join(PROGRAM_KLASORU, "windows_kayit_kapali.txt")):
         return          # kurulumda "PDF PRO ile ac" istenmedi
     try:
