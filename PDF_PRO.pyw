@@ -62,6 +62,10 @@ if sys.platform.startswith("win"):
         pass
 
 if __name__ == "__main__":
+    # Dosya Gezgini: sag tik > Yazdir  ->  yalnizca yazdirma penceresi
+    if len(sys.argv) > 2 and sys.argv[1] == "--yazdir":
+        from pdfpro import yazdir as _yazdir
+        sys.exit(_yazdir.tek_basina(os.path.abspath(sys.argv[2])))
     yollar = [os.path.abspath(a) for a in sys.argv[1:] if os.path.isfile(a)]
     # program zaten aciksa dosyalari o pencerede ac (yeni pencere acma)
     sok = False

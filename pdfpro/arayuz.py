@@ -425,7 +425,7 @@ class Uygulama(EkIslemler, _TemelTk):
                  ("📝", "Farklı Kaydet", self.farkli_kaydet, "Ctrl+Shift+S"),
                  ("✖", "Kapat", lambda: self.belge_kapat(self.belge), "Açık belgeyi kapat (Ctrl+W)")],
                 [("📠", "Tara", self.tara, "Tarayıcıdan tara → PDF (çok sayfa)"),
-                 ("🖨", "Yazdır", self.yazdir, "Varsayılan PDF programıyla yazdır"),
+                 ("🖨", "Yazdır", self.yazdir, "Yazıcı seç, sayfa aralığı, kopya, siyah-beyaz… (Ctrl+P)"),
                  ("📧", "E-posta", self.eposta, "Outlook'ta PDF ekli yeni ileti aç")],
                 [("🕘", "Yedekler", self.yedekler, "Kaydetmeden önceki hallere dön (dosya başına son 10)"),
                  ("📁", "Klasörde Göster", self.klasorde, "Dosyanın bulunduğu klasörü aç")],
@@ -864,6 +864,7 @@ class Uygulama(EkIslemler, _TemelTk):
         k("<Control-z>", self.geri_al, True)
         k("<Control-y>", self.yinele, True)
         k("<Control-w>", lambda: self.belge_kapat(self.belge))
+        k("<Control-p>", self.yazdir)
         k("<Control-plus>", lambda: self.gorunum.zoom_adim(1))
         k("<Control-equal>", lambda: self.gorunum.zoom_adim(1))
         k("<Control-minus>", lambda: self.gorunum.zoom_adim(-1))
@@ -1069,13 +1070,12 @@ class Uygulama(EkIslemler, _TemelTk):
             return
         yol = b.yol if (b.yol and not b.degisti) else b.gecici_kopya()
         try:
-            if WINDOWS:
-                os.startfile(yol, "print")
-                self.durum_yaz("Yazıcıya gönderildi.", basari=True)
-            else:
-                dosya_ac(yol)
+            from . import yazdir as YZD
+            YZD.YazdirPenceresi(self, yol, b.baslik, b.aktif, FONT,
+                                bitince=lambda m, ok: self.durum_yaz(m, basari=ok))
         except Exception as e:
-            messagebox.showerror("PDF PRO", f"Yazdırılamadı (bilgisayarda varsayılan bir PDF programı olmalı):\n{e}")
+            hata_kaydet(traceback.format_exc())
+            messagebox.showerror("PDF PRO", f"Yazdırma penceresi açılamadı:\n{e}")
 
     # ---------------------------------------------------------- degisiklik altyapisi
     def icerik_degisti(self):

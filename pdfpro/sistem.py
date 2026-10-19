@@ -78,7 +78,7 @@ def _oku(winreg, yol, ad=""):
         return None
 
 
-KAYIT_SURUM = "3"
+KAYIT_SURUM = "4"
 
 
 def _sil(winreg, yol):
@@ -241,6 +241,10 @@ def kaydet():
     _yaz(winreg, rf"{c}\{PROGID}\shell\open", "PDF PRO", "FriendlyAppName")
     _yaz(winreg, rf"{c}\{PROGID}\shell\open", simge, "Icon")
     _yaz(winreg, rf"{c}\{PROGID}\shell\open\command", komut)
+    # sag tik > Yazdir (PDF PRO'nun kendi yazdirma penceresi)
+    yaz_komut = komut.replace('"%1"', '--yazdir "%1"')
+    _yaz(winreg, rf"{c}\{PROGID}\shell\print", "Yazdır")
+    _yaz(winreg, rf"{c}\{PROGID}\shell\print\command", yaz_komut)
     # "Birlikte ac" listesinde gorunen ad ve simge
     _yaz(winreg, rf"{c}\{PROGID}\Application", "PDF PRO", "ApplicationName")
     _yaz(winreg, rf"{c}\{PROGID}\Application", simge, "ApplicationIcon")
@@ -259,6 +263,7 @@ def kaydet():
     _yaz(winreg, uyg, "IRONHULL", "ApplicationCompany")
     _yaz(winreg, rf"{uyg}\DefaultIcon", simge)
     _yaz(winreg, rf"{uyg}\shell\open\command", komut)
+    _yaz(winreg, rf"{uyg}\shell\print\command", yaz_komut)
     for uz in UZANTILAR:
         _yaz(winreg, rf"{c}\{uz}\OpenWithProgids", "", PROGID)
         _yaz(winreg, rf"{uyg}\SupportedTypes", "", uz)
