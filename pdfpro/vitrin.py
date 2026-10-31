@@ -51,6 +51,8 @@ ARAC_RENK = {
     "Şifre Koy": MAVI, "Şifreyi Kaldır": MAVI, "Bilgileri Temizle": GRI,
     # Yapay zeka / otomasyon / yardim
     "Özetle": MENEKSE, "Belgeye Sor": MENEKSE, "Çevir": MENEKSE, "Ayarlar": GRI,
+    "Diğer": GRI, "Daha": GRI, "Şekiller": PEMBE, "Form Alanı": MOR, "Klavye Kısayolları": LACI, "Tanıtım Turu": TURUNCU,
+    "Görünüm": MENEKSE,
     "Belge Paketi": TURKUAZ, "İş Akışları": PEMBE, "Windows'a Tanıt": MAVI, "Yönetici": LACI, "Kılavuz": MAVI, "Hakkında": GRI, "Hata Kaydı": KIRMIZI,
 }
 
@@ -94,14 +96,14 @@ def kartlar(u):
     return [
         ("Düzenle", "🗂", "PDF Birleştir", "Birden çok PDF ve resmi istediğiniz sırayla tek dosyada birleştirin.", u.birlestir, KIRMIZI, False, False),
         ("Düzenle", "✂", "PDF Böl", "Sayfaları ayrı dosyalara ya da istediğiniz aralıklara bölün.", u.bol, KIRMIZI, False, True),
-        ("Düzenle", "🔃", "Sayfaları Düzenle", "Sayfaları sürükleyerek sıralayın, silin, döndürün, araya sayfa ekleyin.", lambda: u.menu_sec("Sayfa"), KIRMIZI, False, True),
+        ("Düzenle", "🔃", "Sayfaları Düzenle", "Sayfaları sürükleyerek sıralayın, silin, döndürün, araya sayfa ekleyin.", lambda: u.menu_sec("Sayfalar"), KIRMIZI, False, True),
         ("Düzenle", "✏", "PDF Düzenle", "PDF'teki ya da taranmış resimdeki yazıya tıklayın, aynı yazı tipiyle değiştirin.", lambda: m("yazi_duzelt"), MOR, False, True),
         ("Düzenle", "🔤", "Yazı Ekle", "Sayfanın istediğiniz yerine yazı yazın; yazı tipi, boyut ve renk seçin.", lambda: m("yazi_ekle"), MOR, False, True),
         ("Düzenle", "⟳", "PDF Döndür", "Seçili ya da tüm sayfaları sağa / sola döndürün.", lambda: u.dondur(90), MOR, False, True),
         ("Düzenle", "✂", "PDF Kırp", "Sayfanın kenar boşluklarını kesin; tek sayfaya ya da tümüne uygulayın.", lambda: m("kirp"), MOR, False, True),
         ("Düzenle", "💧", "Filigran", "GİZLİDİR, TASLAK gibi yazı ya da logo filigranı ekleyin.", u.filigran, MOR, False, True),
         ("Düzenle", "1 2", "Sayfa Numaraları", "Sayfa 1 / 5 gibi numaraları istediğiniz konuma ekleyin.", u.sayfa_no, MAVI, False, True),
-        ("Düzenle", "💬", "Not ve Metin Kutusu", "Vurgulayın, not ekleyin, ok ve şekil çizin.", lambda: u.menu_sec("İşaretle"), SARI, False, True),
+        ("Düzenle", "💬", "Not ve Metin Kutusu", "Vurgulayın, not ekleyin, ok ve şekil çizin.", lambda: u.menu_sec("İşaretle & İmza"), SARI, False, True),
         ("Optimize", "🗜", "PDF Sıkıştır", "Dosya boyutunu küçültün; hedef MB yazın, kalite korunsun.", u.sikistir, YESIL, False, True),
         ("Optimize", "OCR", "OCR PDF", "Taranmış belgeleri aranabilir ve kopyalanabilir yapın (Türkçe + İngilizce).", u.ocr_aranabilir, YESIL, False, True),
         ("Optimize", "🔧", "PDF Onar", "Bozuk ya da yarım inmiş PDF'ten kurtarılabilen sayfaları çıkarın.", u.onar, YESIL, False, False),
@@ -126,7 +128,7 @@ def kartlar(u):
         ("İmza & Güvenlik", "⬛", "Karart (Sansür)", "TC no, adres gibi bilgileri kalıcı olarak silin.", lambda: m("karart"), "#26303F", False, True),
         ("İmza & Güvenlik", "⚖", "PDF Karşılaştır", "İki sürümü yan yana koyun; farklar renkli işaretlensin.", u.karsilastir, MAVI, True, True),
         ("İmza & Güvenlik", "▦", "QR / Barkod Oku", "Belgedeki QR kod ve barkodları okuyun, linki açın.", u.qr_oku, GRI, True, True),
-        ("İmza & Güvenlik", "📋", "PDF Formları", "Boş çizgileri otomatik doldurulabilir alana çevirin, formu doldurun.", lambda: u.menu_sec("Form"), MOR, True, True),
+        ("İmza & Güvenlik", "📋", "PDF Formları", "Boş çizgileri otomatik doldurulabilir alana çevirin, formu doldurun.", lambda: u.menu_sec("Düzenle"), MOR, True, True),
         ("Yapay Zeka", "🧠", "Yapay Zeka Özetleyici", "Belgeyi Türkçe özetleyin; tarih, tutar, ad ve numaralar çıkarılsın.", u.ozetle, MENEKSE, True, True),
         ("Yapay Zeka", "🌍", "PDF Çevir", "Düzeni bozmadan başka dile çevirin; tablo ve logolar yerinde kalsın.", u.cevir, MENEKSE, True, True),
         ("Yapay Zeka", "💬", "Belgeye Sor", "\"IMO numarası ne?\" gibi sorular sorun, cevap belgeden gelsin.", u.belgeye_sor, MENEKSE, True, True),
@@ -144,6 +146,9 @@ class Vitrin(tk.Frame):
 
     def __init__(self, ust, u, font="Segoe UI", emoji_font="Segoe UI Emoji", zemin="#FFFFFF"):
         super().__init__(ust, bg=zemin)
+        from . import tema as TM
+        self._px = TM.px
+        self.KART_G, self.KART_Y = TM.px(268), TM.px(132)
         self.u, self.F, self.E, self.Z = u, font, emoji_font, zemin
         self.kategori = "Tümü"
         self._sutun = 0
@@ -216,20 +221,21 @@ class Vitrin(tk.Frame):
         f.grid(row=r, column=c, padx=6, pady=6)
         f.grid_propagate(False)
         f.pack_propagate(False)
-        cv = tk.Canvas(f, width=40, height=40, bg=bg, highlightthickness=0)
-        cv.place(x=16, y=14)
+        P = self._px
+        cv = tk.Canvas(f, width=P(40), height=P(40), bg=bg, highlightthickness=0)
+        cv.place(x=P(16), y=P(14))
         harf = simge in ("W", "X", "P", "A", "M↓", "</>", "1 2", "OCR")
         if not is_akisi:
-            simge_ciz(cv, 2, 2, 34, renk, simge, harf, self.E, self.F)
+            simge_ciz(cv, 2, 2, P(34), renk, simge, harf, self.E, self.F)
         else:
-            cv.create_text(20, 20, text="⚙", fill="#E5322D", font=(self.E, 20))
+            cv.create_text(P(20), P(20), text="⚙", fill="#E5322D", font=(self.E, 20))
         if yeni:
             tk.Label(f, text="Yeni", bg="#DCE8FF", fg="#2F6FDE", font=(self.F, 7, "bold"), padx=5).place(relx=1, x=-10, y=10, anchor="ne")
         b = tk.Label(f, text=baslik, bg=bg, fg="#1F2430", font=(self.F, 10, "bold"), anchor="w")
-        b.place(x=16, y=58)
+        b.place(x=P(16), y=P(58))
         a = tk.Label(f, text=aciklama, bg=bg, fg="#5B6577", font=(self.F, 8), anchor="nw", justify="left",
-                     wraplength=self.KART_G - 32)
-        a.place(x=16, y=80)
+                     wraplength=self.KART_G - P(32))
+        a.place(x=P(16), y=P(80))
         parcalar = (f, cv, b, a)
 
         def tikla(e=None):

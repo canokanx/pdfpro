@@ -42,6 +42,9 @@ HARIC_DOSYA = {"ayarlar.json", "fontlar_onbellek.json", "hata_kaydi.txt", "pytho
                "gomulu_deneme.txt", "guncelleme_deneme.json", "guncelleme_durum.json",
                "son_test_sonucu.txt", "windows_kayit_kapali.txt"}
 HARIC_UZANTI = (".pyc", ".pyo", ".old", ".tmp", ".pdfpro_tmp", ".log")
+# sadece program klasorunun KOKUNDE haric: kurulumla gelen Python ve Tesseract (her bilgisayarda zaten var,
+# guncellemeyle gonderilmez; binlerce dosya ve yuzlerce MB eder)
+HARIC_KOK = {"runtime", "tesseract", "Tesseract-OCR", "python", "venv", ".venv"}
 
 
 class GuncellemeHatasi(Exception):
@@ -61,7 +64,8 @@ def paket_dosyalari(klasor=PROGRAM_KLASORU):
     """Pakete girecek dosyalar: {'pdfpro/arayuz.py': tam_yol, ...} (her zaman / ile)"""
     sonuc = {}
     for kok, klasorler, dosyalar in os.walk(klasor):
-        klasorler[:] = sorted(k for k in klasorler if k not in HARIC_KLASOR and not k.startswith("."))
+        klasorler[:] = sorted(k for k in klasorler if k not in HARIC_KLASOR and not k.startswith(".")
+                              and not (os.path.normcase(kok) == os.path.normcase(klasor) and k in HARIC_KOK))
         for ad in sorted(dosyalar):
             if ad in HARIC_DOSYA or ad.lower().endswith(HARIC_UZANTI) or ad.startswith("~$"):
                 continue

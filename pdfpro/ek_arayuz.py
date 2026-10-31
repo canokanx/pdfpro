@@ -322,7 +322,7 @@ class EkIslemler:
 
     def _ek_alan_secildi(self, mod, i, rect):
         if mod == "metin_kutusu":
-            m = self._metin_sor("🗨 Metin Kutusu", "Yazı kutuya sığdırılır. Boyut / renk / yazı tipi: Giriş sekmesindeki yazı ayarı.")
+            m = self._metin_sor("🗨 Metin Kutusu", "Yazı kutuya sığdırılır. Boyut / renk / yazı tipi: Düzenle sekmesindeki yazı ayarı.")
             if not m:
                 return
             ayar = self.yazi_ayar()
@@ -366,7 +366,7 @@ class EkIslemler:
                 b.geri_al()
                 self.icerik_degisti()
                 messagebox.showinfo("PDF PRO", "Boş form çizgisi / kutusu bulunamadı.\n"
-                                               "Form sekmesindeki Metin Alanı / Onay Kutusu ile elle ekleyebilirsiniz.")
+                                               "Düzenle sekmesindeki Form Alanı ▾ ile elle ekleyebilirsiniz.")
 
     def form_kilitle(self):
         b = self._belge_gerekli()

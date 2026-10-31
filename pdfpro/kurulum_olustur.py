@@ -141,8 +141,6 @@ def tesseract_dosyalari():
     if not t:
         return []
     kok = os.path.dirname(os.path.abspath(t))
-    if os.path.normcase(kok).startswith(os.path.normcase(os.path.join(PROGRAM, "tesseract"))):
-        return []          # zaten program klasorunde (app ile gelir)
     sonuc = []
     for d, klasorler, dosyalar in os.walk(kok):
         rel = os.path.relpath(d, kok).replace(os.sep, "/")

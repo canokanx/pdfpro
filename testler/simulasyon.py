@@ -410,6 +410,77 @@ def t_nbsp():
     assert y and b"<0003> <0020>" in y and b"<00a0> <0041>" in y and b"<0005> <0005> <0020>" in y, y
 
 
+@senaryo("OCR: eğik + gölgeli telefon fotoğrafı ve yan dönmüş sayfa okunmalı, görünüm değişmemeli")
+def t_ocr_iyilestirme():
+    from pdfpro import ocr as O
+    from PIL import Image
+    import numpy as np
+    import io
+    if not O.ocr_durumu()[0]:
+        return "atlandı (Tesseract yok)"
+    d = fitz.open()
+    p = d.new_page()
+    p.insert_font(fontname="dv", fontfile=FONT)
+    p.insert_text((60, 100), "GEMİ ADI: MARVEL EAGLE  LİMAN: TUZLA", fontname="dv", fontsize=14)
+    p.insert_text((60, 130), "Yanaşma ordinosu Çağrı işareti 9HA5123", fontname="dv", fontsize=14)
+    pix = p.get_pixmap(dpi=200)
+    a = np.asarray(Image.frombytes("RGB", (pix.width, pix.height), pix.samples)).astype(np.float32)
+    import cv2
+    h, w = a.shape[:2]
+    a = cv2.warpAffine(a, cv2.getRotationMatrix2D((w / 2, h / 2), 2.5, 1), (w, h), borderValue=(255, 255, 255))
+    a = a * np.linspace(0.5, 1.0, w)[None, :, None]
+    sonuc = []
+    for k, ad in ((0, "egik"), (1, "yan")):
+        b = np.ascontiguousarray(np.rot90(np.clip(a, 0, 255).astype(np.uint8), k))
+        buf = io.BytesIO()
+        Image.fromarray(b).save(buf, "JPEG", quality=70)
+        dd = fitz.open()
+        pp = dd.new_page(width=595 if k == 0 else 842, height=842 if k == 0 else 595)
+        pp.insert_image(pp.rect, stream=buf.getvalue())
+        yol = os.path.join(TMP, f"ocr_{ad}.pdf")
+        dd.save(yol)
+        c, n, notlar = O.aranabilir_pdf(yol, os.path.join(TMP, f"ocr_{ad}_c.pdf"))
+        o = fitz.open(c)
+        assert o[0].search_for("MARVEL"), (ad, o[0].get_text()[:200], notlar)
+        resim_ayni = o[0].get_images()[0][2:4] == dd[0].get_images()[0][2:4]
+        assert resim_ayni, "sayfa resmi değişmemeli"
+        sonuc.append(f"{ad}: {notlar}")
+    return " · ".join(sonuc)
+
+
+@senaryo("Sıkıştırma: siyah-beyaz tarama kayıpsız kalmalı, hedefe en kaliteli ayarla inmeli")
+def t_sikistir_akilli():
+    from pdfpro import cekirdek as C
+    from PIL import Image
+    import numpy as np
+    import io
+    rng = np.random.default_rng(5)
+    a = (rng.random((3508, 2480)) > 0.03).astype(np.uint8) * 255
+    buf = io.BytesIO()
+    Image.fromarray(a).convert("1").save(buf, "PNG")
+    d = fitz.open()
+    p = d.new_page()
+    p.insert_image(p.rect, stream=buf.getvalue())
+    yol = os.path.join(TMP, "bitonal.pdf")
+    d.save(yol)
+    _, once, sonra, ac = C.sikistir(yol, os.path.join(TMP, "bitonal_k.pdf"), "orta")
+    im = fitz.open(os.path.join(TMP, "bitonal_k.pdf"))[0].get_images(full=True)[0]
+    assert im[4] == 1 and im[2] == 2480, f"1 bit ve tam çözünürlük kalmalı: {im}"
+    # renkli tarama: hedef verildiginde gereksiz kucultmemeli
+    r = (rng.random((1754, 1240, 3)) * 60 + 180).astype(np.uint8)
+    buf = io.BytesIO()
+    Image.fromarray(r).save(buf, "JPEG", quality=95)
+    d = fitz.open()
+    for _ in range(3):
+        p = d.new_page()
+        p.insert_image(p.rect, stream=buf.getvalue())
+    yol2 = os.path.join(TMP, "renkli.pdf")
+    d.save(yol2)
+    _, o2, s2, ac2 = C.sikistir(yol2, os.path.join(TMP, "renkli_k.pdf"), "en_kucuk", hedef_kb=os.path.getsize(yol2) / 1024 * 0.6)
+    assert s2 <= os.path.getsize(yol2) * 0.6, (o2, s2)
+    return f"bitonal {once // 1024}→{sonra // 1024} KB; hedefli: {ac2}"
+
+
 def main():
     testler = [v for k, v in globals().items() if k.startswith("t_") and callable(v)]
     for t in testler:

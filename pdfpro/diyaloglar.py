@@ -452,7 +452,12 @@ class SikistirDiyalog(Diyalog):
         self.hedef = ttk.Combobox(f, values=["", "0.5", "1", "2", "3", "5", "10"], width=6)
         self.hedef.pack(side="left")
         ttk.Label(f, text=" MB'ın altına indir (boş = seçilen seviye)", style="Kart.TLabel").pack(side="left")
-        self.satir("Hedef boyut:", f, "Örn. sistem 2 MB'tan büyük dosya kabul etmiyorsa 2 yazın; gerekirse seviyeyi kendisi artırır.")
+        self.satir("Hedef boyut:", f, "Örn. sistem 2 MB üstünü kabul etmiyorsa 2 yazın.\n"
+                                       "Bu boyuta sığan EN KALİTELİ ayarı kendisi bulur.")
+        self.renk_izni = tk.BooleanVar(value=True)
+        self.tam_satir(ttk.Checkbutton(self.govde, text="Hedefe inemezse gri / siyah-beyaz yapmaya izin ver\n"
+                                                         "(kaşe ve imzanın rengi gider, yazılar net kalır)",
+                                       variable=self.renk_izni, style="Kart.TCheckbutton"), pady=(2, 2))
 
     def topla(self):
         h = self.hedef.get().strip().replace(",", ".")
@@ -460,31 +465,65 @@ class SikistirDiyalog(Diyalog):
             hedef_kb = float(h) * 1024 if h else None
         except ValueError:
             raise ValueError("Hedef boyut sayı olmalı (örn. 2).")
-        return {"seviye": self.seviye.get(), "gri": self.gri.get(), "hedef_kb": hedef_kb}
+        return {"seviye": self.seviye.get(), "gri": self.gri.get(), "hedef_kb": hedef_kb,
+                "renk_izni": self.renk_izni.get()}
 
 
 # ================================================================== OCR
 class OcrDiyalog(Diyalog):
-    def __init__(self, ust, baslik="🔍 Aranabilir PDF (OCR)", aciklama=None, dugme="Başlat"):
+    MOTORLAR = [("tesseract", "Bilgisayarda oku (Tesseract) — internetsiz, hızlı"),
+                ("otomatik", "Otomatik — zor okunan sayfaları yapay zekaya sor (Gemini)"),
+                ("yz", "Tümünü yapay zekayla oku (Gemini) — el yazısı, kötü fotoğraf")]
+
+    def __init__(self, ust, baslik="🔍 Aranabilir PDF (OCR)", aciklama=None, dugme="Başlat", sadece_secenegi=True):
         super().__init__(ust, baslik, aciklama or
-                         "Taranmış sayfalardaki yazılar okunur; görünüm aynı kalır, metin aranabilir ve "
-                         "düzeltilebilir hale gelir.", dugme=dugme)
+                         "Taranmış sayfalardaki yazılar okunur. Sayfanın görünümü HİÇ değişmez; üstüne görünmez bir "
+                         "yazı katmanı eklenir: aranabilir, kopyalanabilir ve 'Yazı Düzelt' ile düzeltilebilir.",
+                         dugme=dugme, genislik=520)
+        ayar = getattr(ust, "ayar", {}) or {}
         f = ttk.Frame(self.govde, style="Kart.TFrame")
         self.tur = tk.BooleanVar(value=True)
         self.eng = tk.BooleanVar(value=True)
         ttk.Checkbutton(f, text="Türkçe", variable=self.tur, style="Kart.TCheckbutton").pack(side="left")
         ttk.Checkbutton(f, text="İngilizce", variable=self.eng, style="Kart.TCheckbutton").pack(side="left", padx=10)
         self.satir("Dil:", f)
-        self.dpi = ttk.Combobox(self.govde, values=["Hızlı (200 dpi)", "Normal (300 dpi)", "Yüksek (400 dpi)"], state="readonly")
-        self.dpi.current(1)
+        self.dpi = ttk.Combobox(self.govde, values=["Hızlı (200 dpi, hızlı model)", "Normal (300 dpi) — önerilen",
+                                                    "Yüksek (400 dpi) — küçük yazılar"], state="readonly", width=32)
+        self.dpi.current(int(ayar.get("ocr_kalite", 1)))
         self.satir("Kalite:", self.dpi)
+        self.iyilestir = tk.BooleanVar(value=ayar.get("ocr_iyilestir", True))
+        self.tam_satir(ttk.Checkbutton(self.govde, text="Görüntüyü iyileştir: eğikliği düzelt, ters / yan sayfayı\n"
+                                                        "çevir, gölge ve soluk yazıyı temizle", variable=self.iyilestir,
+                                       style="Kart.TCheckbutton"), pady=(6, 2))
+        try:
+            from . import yapay_zeka as YZ
+            yz_hazir = YZ.hazir_mi(ayar.get("yz", {})) and YZ.ayar_tam(ayar.get("yz", {}))["tur"] == "gemini"
+        except Exception:
+            yz_hazir = False
+        self.motor = tk.StringVar(value=ayar.get("ocr_motor", "tesseract") if yz_hazir else "tesseract")
+        m = ttk.Frame(self.govde, style="Kart.TFrame")
+        for deger, metin in self.MOTORLAR:
+            rb = ttk.Radiobutton(m, text=metin, value=deger, variable=self.motor, style="Kart.TRadiobutton")
+            rb.pack(anchor="w")
+            if deger != "tesseract" and not yz_hazir:
+                rb.state(["disabled"])
+        self.satir("Okuma:", m, None if yz_hazir else
+                   "Yapay zeka seçenekleri için Yapay Zeka → Ayarlar'dan ücretsiz Gemini anahtarı ekleyin. "
+                   "Bu seçeneklerde sayfa resmi Google'a gönderilir.")
         self.sadece = tk.BooleanVar(value=True)
-        self.tam_satir(ttk.Checkbutton(self.govde, text="Zaten yazısı olan sayfalara dokunma", variable=self.sadece,
-                                       style="Kart.TCheckbutton"))
+        if sadece_secenegi:
+            self.tam_satir(ttk.Checkbutton(self.govde, text="Zaten yazısı olan sayfalara dokunma", variable=self.sadece,
+                                           style="Kart.TCheckbutton"))
 
     def topla(self):
         d = "+".join(k for k, v in (("tur", self.tur), ("eng", self.eng)) if v.get()) or "tur"
-        return {"dil": d, "dpi": (200, 300, 400)[self.dpi.current()], "sadece": self.sadece.get()}
+        i = self.dpi.current()
+        try:
+            self.u.ayar.update(ocr_kalite=i, ocr_iyilestir=self.iyilestir.get(), ocr_motor=self.motor.get())
+        except Exception:
+            pass
+        return {"dil": d, "dpi": (200, 300, 400)[i], "hizli": i == 0, "sadece": self.sadece.get(),
+                "iyilestir": self.iyilestir.get(), "motor": self.motor.get()}
 
 
 # ================================================================== metin penceresi

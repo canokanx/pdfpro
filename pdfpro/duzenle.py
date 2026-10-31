@@ -369,7 +369,7 @@ def font_sec(page, satir, metin, kalin=None):
     return font_al(satir["serif"], k, satir["italik"])
 
 
-def tw_yaz(page, tw, morph=None):
+def tw_yaz(page, tw, morph=None, render_mode=0):
     """TextWriter'i sayfaya yazar. Kirpilmis (CropBox'i MediaBox'tan farkli) sayfalarda
     PyMuPDF'in TextWriter'i yaziyi dikeyde kaydirir; burada duzeltilir."""
     cb, mb = page.cropbox, page.mediabox
@@ -377,7 +377,7 @@ def tw_yaz(page, tw, morph=None):
     if abs(dy) > 0.01:
         T = fitz.Matrix(1, 0, 0, 1, 0, dy)
         morph = (morph[0], morph[1] * T) if morph else (fitz.Point(0, 0), T)
-    tw.write_text(page, morph=morph)
+    tw.write_text(page, morph=morph, render_mode=render_mode)
     bosluk_duzelt(page)
 
 

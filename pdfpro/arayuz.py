@@ -29,6 +29,8 @@ from . import fontlar
 from .ek_arayuz import EkIslemler
 from . import vitrin as V
 from . import teker as TK
+from . import tema as TM
+from .kolaylik import KolaylikIslemleri
 
 try:
     from tkinterdnd2 import TkinterDnD, DND_FILES
@@ -62,7 +64,8 @@ R_YAZI = "#1E293B"
 R_SOLUK = "#64748B"
 R_CIZGI = "#E5E7EB"
 # her menunun kendi rengi
-MENU_RENKLERI = {"Dosya": "#2563EB", "Giriş": "#7C3AED", "Sayfa": "#0891B2", "İşaretle": "#EAB308",
+MENU_RENKLERI = {"Ana Sayfa": "#2563EB", "Düzenle": "#7C3AED", "Sayfalar": "#0891B2", "İşaretle & İmza": "#DC2626",
+                 "Dosya": "#2563EB", "Giriş": "#7C3AED", "Sayfa": "#0891B2", "İşaretle": "#EAB308",
                  "İmza & Damga": "#DC2626", "Form": "#9333EA", "Dönüştür": "#16A34A", "Araçlar": "#EA580C",
                  "Koruma": "#475569", "Yapay Zeka": "#DB2777", "Otomasyon": "#0D9488", "Yardım": "#2563EB"}
 # arac dugmesi simge renkleri (sirayla kullanilir)
@@ -197,10 +200,13 @@ class IpucuBalonu:
 _TemelTk = TkinterDnD.Tk if DND else tk.Tk
 
 
-class Uygulama(EkIslemler, _TemelTk):
+class Uygulama(EkIslemler, KolaylikIslemleri, _TemelTk):
     def __init__(self, acilacaklar=(), sok=None):
+        ayar = ayar_oku()
+        TM.baslat(ayar)                    # acik / koyu tema + arayuz buyuklugu (ilk pencereden once)
         super().__init__()
-        self.ayar = ayar_oku()
+        TM.kok_hazir(self)
+        self.ayar = ayar
         self.title(f"PDF PRO {SURUM}")
         self.configure(bg=R_ZEMIN)
         self._pencere_boyutu()
@@ -231,7 +237,7 @@ class Uygulama(EkIslemler, _TemelTk):
         self._menu_seridi()
         self._menu_seridi_alt = tk.Frame(self, bg=R_VURGU, height=3)
         self._menu_seridi_alt.pack(fill="x")
-        self._arac_cubugu = tk.Frame(self, bg=R_ARAC, height=76)
+        self._arac_cubugu = tk.Frame(self, bg=R_ARAC, height=TM.px(86))
         self._arac_cubugu.pack(fill="x")
         self._arac_cubugu.pack_propagate(False)
         tk.Frame(self, bg=R_CIZGI, height=1).pack(fill="x")
@@ -239,14 +245,16 @@ class Uygulama(EkIslemler, _TemelTk):
         self._durum_cubugu()
         self._orta_alan()
 
-        self.menu_sec(self.ayar.get("menu", "Giriş"))
+        self.menu_sec(self.ayar.get("menu", "Ana Sayfa"))
         self._kisayollar()
+        self.after(1200, self.tur_gerekirse)
         self.protocol("WM_DELETE_WINDOW", self.kapat)
         self.after(100, self._kuyruk_isle)
         self.after(400, self._ocr_kontrol)
         self.after(150, lambda: self.karsilama_goster(not self.belgeler))
-        if acilacaklar:
-            self.after(250, lambda: self.ac(list(acilacaklar)))
+        yeniden = [y for y in self.ayar.pop("yeniden_ac", []) or [] if os.path.isfile(y)]
+        if acilacaklar or yeniden:
+            self.after(250, lambda: self.ac(list(acilacaklar) or yeniden))
         self._sok = sok
         self._yeniden = False
         if sok is not None:
@@ -302,19 +310,31 @@ class Uygulama(EkIslemler, _TemelTk):
         s.configure("TScale", background=R_ZEMIN, troughcolor="#E5E7EB")
         s.configure("Alt.Horizontal.TScale", background=R_LOGO, troughcolor="#E5E7EB", bordercolor="#E5E7EB",
                     lightcolor=R_LOGO, darkcolor="#EA580C")
-        s.configure("TEntry", padding=3)
+        s.configure("TEntry", padding=3, fieldbackground="white", foreground=R_YAZI, insertcolor=R_YAZI,
+                    bordercolor="#D1D5DB", lightcolor="#FFFFFF", darkcolor="#FFFFFF")
+        for ad_ in ("TCombobox", "TSpinbox"):
+            s.configure(ad_, fieldbackground="white", foreground=R_YAZI, insertcolor=R_YAZI,
+                        selectbackground="#4F46E5", selectforeground="white",
+                        bordercolor="#D1D5DB", lightcolor="#FFFFFF", darkcolor="#FFFFFF")
+            s.map(ad_, fieldbackground=[("readonly", "#F3F4F6"), ("disabled", "#F3F4F6")],
+                  foreground=[("disabled", "#9CA3AF")])
+        for ad_ in ("TCheckbutton", "TRadiobutton", "Kart.TCheckbutton", "Kart.TRadiobutton", "Arac.TCheckbutton"):
+            s.configure(ad_, indicatorbackground="white", foreground=R_YAZI)
         s.configure("Horizontal.TProgressbar", background="#10B981", troughcolor="#E5E7EB", borderwidth=0)
         for yon in ("Vertical", "Horizontal"):
             s.configure(f"Belge.{yon}.TScrollbar", gripcount=0, background="#C4C7CC", troughcolor="#FFFFFF",
-                        bordercolor="#FFFFFF", arrowcolor="#6B7280", arrowsize=16, relief="flat")
+                        bordercolor="#FFFFFF", lightcolor="#C4C7CC", darkcolor="#C4C7CC",
+                        arrowcolor="#6B7280", arrowsize=16, relief="flat")
             s.map(f"Belge.{yon}.TScrollbar", background=[("pressed", "#6B7280"), ("active", "#9CA3AF")])
 
     # ---------------------------------------------------------- menu seridi
-    MENULER = ["Dosya", "Giriş", "Sayfa", "İşaretle", "İmza & Damga", "Form", "Dönüştür", "Araçlar",
-               "Koruma", "Yapay Zeka", "Otomasyon", "Yardım"]
+    MENULER = ["Ana Sayfa", "Düzenle", "Sayfalar", "İşaretle & İmza", "Dönüştür", "Araçlar", "Yapay Zeka"]
+    ESKI_MENULER = {"Dosya": "Ana Sayfa", "Giriş": "Ana Sayfa", "Sayfa": "Sayfalar", "İşaretle": "İşaretle & İmza",
+                    "İmza & Damga": "İşaretle & İmza", "Form": "Düzenle", "Koruma": "Araçlar",
+                    "Otomasyon": "Araçlar", "Yardım": "Ana Sayfa"}
 
     def _menu_seridi(self):
-        m = tk.Frame(self, bg=R_MENU, height=30)
+        m = tk.Frame(self, bg=R_MENU, height=TM.px(32))
         m.pack(fill="x")
         m.pack_propagate(False)
         tk.Label(m, text=" ◆ PDF PRO ", bg=R_LOGO, fg="white", font=(FONT, 10, "bold")).pack(side="left", fill="y")
@@ -329,12 +349,14 @@ class Uygulama(EkIslemler, _TemelTk):
             e.bind("<Leave>", lambda ev, w=e, a=ad: w.config(fg="white" if a == self._secili_menu else R_MENU_YAZI,
                                                             bg=MENU_RENKLERI.get(a, R_VURGU) if a == self._secili_menu else R_MENU))
             self._menu_etiketleri[ad] = e
+        self._sag_menu_dugmeleri(m)
         self.ocr_etiket = tk.Label(m, text="", bg=R_MENU, fg=R_SOLUK, font=(FONT, 9))
         self.ocr_etiket.pack(side="right", padx=10)
 
     def menu_sec(self, ad):
+        ad = self.ESKI_MENULER.get(ad, ad)
         if ad not in self.MENULER:
-            ad = "Giriş"
+            ad = "Ana Sayfa"
         self._secili_menu = ad
         for a, e in self._menu_etiketleri.items():
             e.config(bg=MENU_RENKLERI.get(a, R_VURGU) if a == ad else R_MENU, fg="white" if a == ad else R_MENU_YAZI,
@@ -359,14 +381,83 @@ class Uygulama(EkIslemler, _TemelTk):
             pass
         self._mod_dugmeleri = {}
         self._simge_sira = list(MENU_RENKLERI).index(ad) if ad in MENU_RENKLERI else 0
+        self._sik_kullanilanlar_ciz(c)
+        self._arac_ogeleri = []
         for gi, grup in enumerate(self._menu_icerigi(ad)):
-            if gi:
-                tk.Frame(c, bg=R_CIZGI, width=1).pack(side="left", fill="y", pady=12, padx=6)
+            tk.Frame(c, bg=R_CIZGI, width=1).pack(side="left", fill="y", pady=12, padx=6)
             if callable(grup):
                 grup(c)
                 continue
             for oge in grup:
-                self._arac_dugmesi(c, *oge)
+                f = self._arac_dugmesi(c, *oge)
+                self._arac_ogeleri.append((f, oge))
+        self._tasma_kontrol()
+        if not getattr(self, "_arac_izleniyor", False):
+            self._arac_izleniyor = True
+            c.bind("<Configure>", self._arac_boyut_degisti, add="+")
+
+    def _arac_boyut_degisti(self, e):
+        """Pencere daralip genisleyince sigmayan araclari 'Daha »' menusune al / geri getir."""
+        if abs(e.width - getattr(self, "_arac_genislik", e.width)) < 24:
+            return
+        if getattr(self, "_arac_zaman", None):
+            try:
+                self.after_cancel(self._arac_zaman)
+            except tk.TclError:
+                pass
+        self._arac_zaman = self.after(200, lambda: self._arac_doldur(self._secili_menu))
+
+    def _tasma_kontrol(self):
+        c = self._arac_cubugu
+        try:
+            c.update_idletasks()
+        except tk.TclError:
+            return
+        W = c.winfo_width()
+        self._arac_genislik = W
+        if W < 200:
+            return
+
+        def sag_kenar():
+            """paketlenen her seyin istedigi toplam genislik (pack son ogeyi sessizce kirpar)"""
+            top = 0
+            for w in c.winfo_children():
+                try:
+                    pad = w.pack_info().get("padx", 0)
+                except tk.TclError:
+                    continue
+                if isinstance(pad, (tuple, list)):
+                    pad = sum(int(x) for x in pad)
+                else:
+                    parca = str(pad).split()
+                    pad = sum(int(float(x)) for x in parca) if len(parca) > 1 else int(float(parca[0] or 0)) * 2
+                top += w.winfo_reqwidth() + pad
+            return top
+        if sag_kenar() <= W:
+            return
+        pay = TM.px(84)
+        tasan = []
+        while self._arac_ogeleri and sag_kenar() > W - pay:
+            f, oge = self._arac_ogeleri.pop()
+            f.destroy()
+            tasan.insert(0, oge)
+            # sonda kalan bos ayirac cizgilerini de kaldir
+            while c.winfo_children() and isinstance(c.winfo_children()[-1], tk.Frame) \
+                    and not c.winfo_children()[-1].winfo_children() and c.winfo_children()[-1].winfo_reqwidth() <= 2:
+                c.winfo_children()[-1].destroy()
+            c.update_idletasks()
+        if not tasan:
+            return
+        liste = []
+        for oge in tasan:
+            if isinstance(oge[2], (list, tuple)):
+                if liste:
+                    liste.append(None)
+                liste.extend(oge[2])
+            else:
+                liste.append(oge)
+        tk.Frame(c, bg=R_CIZGI, width=1).pack(side="left", fill="y", pady=12, padx=6)
+        self._arac_dugmesi(c, "»", "Daha", liste, "Pencereye sığmayan araçlar")
 
     def _arac_dugmesi(self, ust, simge, etiket, komut, ipucu=None, mod=None):
         renk_ = V.ARAC_RENK.get(etiket) or MENU_RENKLERI.get(self._secili_menu, R_VURGU)
@@ -376,10 +467,10 @@ class Uygulama(EkIslemler, _TemelTk):
         zemin_bg = getattr(self, "_arac_bg", R_ARAC)
         f = tk.Frame(ust, bg=zemin_bg, cursor="hand2")
         f.pack(side="left", fill="y", padx=1, pady=3)
-        K = 40
+        K = TM.px(40)
         cv = tk.Canvas(f, width=K, height=K, bg=zemin_bg, highlightthickness=0, bd=0)
         cv.pack(pady=(5, 1))
-        kare, yazi = V.simge_ciz(cv, 4, 4, 32, renk_, simge, harf, EMOJI_FONT, FONT)
+        kare, yazi = V.simge_ciz(cv, TM.px(4), TM.px(4), TM.px(32), renk_, simge, harf, EMOJI_FONT, FONT)
         e = tk.Label(f, text=etiket, bg=zemin_bg, fg="#2A3140", font=(FONT, 9), padx=7)
         e.pack()
         parcalar = (f, cv, e)
@@ -404,79 +495,106 @@ class Uygulama(EkIslemler, _TemelTk):
         def secili_mi():
             return bool(mod) and self.mod == mod
 
+        if isinstance(komut, (list, tuple)):           # "Diğer ▾" gibi acilir liste
+            liste = komut
+            komut = lambda: self.acilir_arac_menusu(f, liste)
+            e.config(text=etiket + " ▾")
+        else:
+            komut = self._sayarak(etiket, komut)
         for w in parcalar:
             w.bind("<Enter>", lambda ev: boya("secili" if secili_mi() else "uzerinde"))
             w.bind("<Leave>", lambda ev: boya("secili" if secili_mi() else "normal"))
             w.bind("<Button-1>", lambda ev: komut())
+            w.bind("<Button-3>", lambda ev: self.arac_sag_tik(ev, etiket))
         if ipucu:
             IpucuBalonu(f, ipucu)
         if mod:
             self._mod_dugmeleri[mod] = lambda sec: boya("secili" if sec else "normal")
             if self.mod == mod:
                 boya("secili")
+        return f
 
     def _menu_icerigi(self, ad):
+        """Her sekmenin araclari. Bir ogenin komutu liste ise "▾" acilir menu olur (az kullanilanlar)."""
         m = self.mod_sec
-        if ad == "Dosya":
+        if ad == "Ana Sayfa":
             return [
-                [("🧰", "Tüm Araçlar", self.tum_araclar, "Bütün araçları kartlar halinde göster"),
-                 ("📂", "Aç", self.ac, "PDF, resim, Word, Excel, PowerPoint aç (Ctrl+O)"),
+                [("📂", "Aç", self.ac, "PDF, resim, Word, Excel, PowerPoint aç (Ctrl+O)"),
                  ("💾", "Kaydet", self.kaydet, "Ctrl+S · Eski hali otomatik yedeklenir"),
                  ("📝", "Farklı Kaydet", self.farkli_kaydet, "Ctrl+Shift+S"),
-                 ("✖", "Kapat", lambda: self.belge_kapat(self.belge), "Açık belgeyi kapat (Ctrl+W)")],
-                [("📠", "Tara", self.tara, "Tarayıcıdan tara → PDF (çok sayfa)"),
-                 ("🖨", "Yazdır", self.yazdir, "Yazıcı seç, sayfa aralığı, kopya, siyah-beyaz… (Ctrl+P)"),
-                 ("📧", "E-posta", self.eposta, "Outlook'ta PDF ekli yeni ileti aç")],
-                [("🕘", "Yedekler", self.yedekler, "Kaydetmeden önceki hallere dön (dosya başına son 10)"),
-                 ("📁", "Klasörde Göster", self.klasorde, "Dosyanın bulunduğu klasörü aç")],
-            ]
-        if ad == "Giriş":
-            return [
+                 ("🖨", "Yazdır", self.yazdir, "Yazıcı seç, sayfa aralığı, kopya, siyah-beyaz… (Ctrl+P)")],
                 [("↶", "Geri Al", self.geri_al, "Ctrl+Z"), ("↷", "Yinele", self.yinele, "Ctrl+Y")],
                 [("🖐", "Seç", lambda: m("sec"), "Kaydır, imza / kaşe seç-taşı, form alanı doldur (Esc)", "sec"),
                  ("✏", "Yazı Düzelt", lambda: m("yazi_duzelt"),
                   "PDF'teki VEYA resimdeki (tarama, kimlik, ehliyet) yazıya tıklayın, değiştirin, Enter", "yazi_duzelt"),
+                 ("🔤", "Yazı Ekle", lambda: m("yazi_ekle"), "Sayfada yazmak istediğiniz yere tıklayın", "yazi_ekle")],
+                [("🔍", "Ara", self.arama_ac, "Belgede ara (Ctrl+F)"),
+                 ("🗂", "Birleştir", self.birlestir, "Birden çok PDF / resmi tek belgede birleştir"),
+                 ("🗜", "Sıkıştır", self.sikistir, "Dosya boyutunu küçült (hedef MB seçilebilir)")],
+                [("⋯", "Diğer", [
+                    ("✖", "Kapat", lambda: self.belge_kapat(self.belge), "Ctrl+W"),
+                    ("📠", "Tara", self.tara, "Tarayıcıdan tara → PDF"),
+                    ("📧", "E-posta", self.eposta, "Outlook'ta PDF ekli yeni ileti"),
+                    ("🕘", "Yedekler", self.yedekler, "Kaydetmeden önceki hallere dön"),
+                    ("📁", "Klasörde Göster", self.klasorde, "Dosyanın bulunduğu klasör"),
+                    None,
+                    ("➕", "Yakınlaş", lambda: self.gorunum.zoom_adim(1), "Ctrl + tekerlek"),
+                    ("➖", "Uzaklaş", lambda: self.gorunum.zoom_adim(-1), ""),
+                    ("↔", "Genişlik", lambda: self.gorunum.zoom_ayarla("genislik"), "Genişliğe sığdır"),
+                    ("▣", "Sayfa", lambda: self.gorunum.zoom_ayarla("sayfa"), "Tüm sayfa"),
+                    None,
+                    ("🧰", "Tüm Araçlar", self.tum_araclar, "Bütün araçlar kartlar halinde")],
+                  "Kapat, tara, e-posta, yedekler, yakınlaştırma…")],
+            ]
+        if ad == "Düzenle":
+            return [
+                [("🖐", "Seç", lambda: m("sec"), "Kaydır, imza / kaşe seç-taşı, form alanı doldur (Esc)", "sec"),
+                 ("✏", "Yazı Düzelt", lambda: m("yazi_duzelt"),
+                  "PDF'teki VEYA resimdeki yazıya tıklayın, değiştirin, Enter", "yazi_duzelt"),
                  ("🔎", "Resimde Yazı", lambda: m("resim_yazi"),
-                  "Resimdeki yazının etrafına kutu çizin: okunur, düzeltilir (tıklama yetmezse)", "resim_yazi"),
+                  "Resimdeki yazının etrafına kutu çizin: okunur, düzeltilir", "resim_yazi"),
                  ("🔤", "Yazı Ekle", lambda: m("yazi_ekle"), "Sayfada yazmak istediğiniz yere tıklayın", "yazi_ekle"),
                  ("⬜", "Beyaz Kutu", lambda: m("beyaz_kutu"), "Silmek istediğiniz alanın üstüne kutu çizin", "beyaz_kutu")],
                 self._yazi_ayar_grubu,
-                [("🔍", "Ara", self.arama_ac, "Belgede ara (Ctrl+F)"),
-                 ("🔁", "Bul-Değiştir", lambda: self.arama_ac(degistir=True), "Bir yazıyı tüm belgede değiştir (Ctrl+H)")],
-                [("➕", "Yakınlaş", lambda: self.gorunum.zoom_adim(1), "Ctrl + fare tekeri"),
-                 ("➖", "Uzaklaş", lambda: self.gorunum.zoom_adim(-1)),
-                 ("↔", "Genişlik", lambda: self.gorunum.zoom_ayarla("genislik"), "Sayfa genişliğine sığdır"),
-                 ("▣", "Sayfa", lambda: self.gorunum.zoom_ayarla("sayfa"), "Tüm sayfayı göster")],
+                [("🔁", "Bul-Değiştir", lambda: self.arama_ac(degistir=True), "Bir yazıyı tüm belgede değiştir (Ctrl+H)")],
+                [("📋", "Form Doldur", self.form_doldur, "Tüm form alanlarını liste halinde doldur"),
+                 ("✨", "Otomatik Algıla", self.form_otomatik, "Boş çizgileri ( ____ ) ve kutucukları forma çevir"),
+                 ("⋯", "Form Alanı", [
+                     ("▭", "Metin Alanı", lambda: m("form_metin"), "Doldurulabilir yazı alanı: kutu çizin", "form_metin"),
+                     ("☑", "Onay Kutusu", lambda: m("form_onay"), "İşaretlenebilir kutu: tıklayın", "form_onay"),
+                     ("☰", "Açılır Liste", lambda: m("form_liste"), "Seçenek listesi: kutu çizin", "form_liste"),
+                     None,
+                     ("🔏", "Formu Kilitle", self.form_kilitle, "Doldurulmuş değerleri kalıcı işle")],
+                  "Metin alanı, onay kutusu, açılır liste ekle · formu kilitle")],
             ]
-        if ad == "Sayfa":
+        if ad == "Sayfalar":
             return [
                 [("⟲", "Sola Döndür", lambda: self.dondur(-90), "Seçili sayfaları sola döndür"),
                  ("⟳", "Sağa Döndür", lambda: self.dondur(90), "Seçili sayfaları sağa döndür"),
                  ("🗑", "Sil", self.sayfa_sil, "Seçili sayfaları sil (Delete)")],
                 [("📄", "Boş Sayfa", self.bos_sayfa, "Seçili sayfadan sonra boş sayfa ekle"),
                  ("📥", "Dosyadan Ekle", self.dosyadan_ekle, "Başka PDF/resmin sayfalarını araya ekle"),
-                 ("📤", "Ayır", self.sayfalari_ayir, "Seçili sayfaları yeni belge olarak aç"),
-                 ("🔃", "Ters Çevir", self.ters_cevir, "Sayfa sırasını tersine çevir")],
+                 ("📤", "Ayır", self.sayfalari_ayir, "Seçili sayfaları yeni belge olarak aç")],
                 [("🗂", "Birleştir", self.birlestir, "Birden çok PDF / resmi tek belgede birleştir"),
                  ("✂", "Böl", self.bol, "Belgeyi parçalara ayırıp klasöre kaydet")],
                 [("✂", "Kırp", lambda: m("kirp"), "Sayfada kalacak alanı kutu ile seçin", "kirp"),
                  ("📐", "A4'e Sığdır", self.a4e_sigdir, "Farklı boyuttaki taramaları A4 yap"),
-                 ("#", "Sayfa No", self.sayfa_no, "Sayfa 1 / 5 gibi numara ekle")],
+                 ("#", "Sayfa No", self.sayfa_no, "Sayfa 1 / 5 gibi numara ekle"),
+                 ("🔃", "Ters Çevir", self.ters_cevir, "Sayfa sırasını tersine çevir")],
             ]
-        if ad == "İşaretle":
+        if ad == "İşaretle & İmza":
             return [
                 [("🖍", "Vurgula", lambda: m("vurgula"), "Fosforlu kalem: yazının üstüne kutu çizin", "vurgula"),
                  ("💬", "Not", lambda: m("not"), "Sayfaya yapışkan not / yorum ekle (tıklayın)", "not"),
-                 ("🗨", "Metin Kutusu", lambda: m("metin_kutusu"), "Çerçeveli açıklama kutusu (kutu çizin)", "metin_kutusu")],
-                [("▭", "Dikdörtgen", lambda: m("sekil_dikdortgen"), "Çerçeve çiz", "sekil_dikdortgen"),
-                 ("◯", "Elips", lambda: m("sekil_elips"), "Daire / elips çiz", "sekil_elips"),
-                 ("╱", "Çizgi", lambda: m("sekil_cizgi"), "Çizgi çiz", "sekil_cizgi"),
-                 ("➚", "Ok", lambda: m("sekil_ok"), "Ok çiz", "sekil_ok")],
-                [("⬛", "Karart", lambda: m("karart"),
+                 ("🗨", "Metin Kutusu", lambda: m("metin_kutusu"), "Çerçeveli açıklama kutusu (kutu çizin)", "metin_kutusu"),
+                 ("⋯", "Şekiller", [
+                     ("▭", "Dikdörtgen", lambda: m("sekil_dikdortgen"), "Çerçeve çiz", "sekil_dikdortgen"),
+                     ("◯", "Elips", lambda: m("sekil_elips"), "Daire / elips çiz", "sekil_elips"),
+                     ("╱", "Çizgi", lambda: m("sekil_cizgi"), "Çizgi çiz", "sekil_cizgi"),
+                     ("➚", "Ok", lambda: m("sekil_ok"), "Ok çiz", "sekil_ok")],
+                  "Dikdörtgen, elips, çizgi, ok"),
+                 ("⬛", "Karart", lambda: m("karart"),
                   "KALICI gizle (TC no, adres vb.): alttaki yazı ve resim tamamen silinir", "karart")],
-            ]
-        if ad == "İmza & Damga":
-            return [
                 [("✍", "İmza / Kaşe", self.imza_baslat, "Resmi seçip sayfada yerine tıklayın", "imza"),
                  ("🖋", "İmza Setleri", self.imza_setleri, "İmza + kaşeyi birlikte kaydet, tek tıkla ikisini koy"),
                  ("⚡", "Seti Koy", lambda: self.set_baslat(), "Son kullanılan imza + kaşe setini sayfaya koy", "set")],
@@ -484,47 +602,39 @@ class Uygulama(EkIslemler, _TemelTk):
                  ("🏢", "Antet", self.antet, "Antetli kağıt (PDF veya resim) bas"),
                  ("💧", "Filigran", self.filigran, "GİZLİDİR, TASLAK vb. veya logo")],
             ]
-        if ad == "Form":
-            return [
-                [("📋", "Form Doldur", self.form_doldur, "Tüm form alanlarını liste halinde doldur "
-                                                         "(veya Seç modunda alana tıklayın)")],
-                [("✨", "Otomatik Algıla", self.form_otomatik, "Boş çizgileri ( ____ ) ve kutucukları forma çevir"),
-                 ("▭", "Metin Alanı", lambda: m("form_metin"), "Doldurulabilir yazı alanı: kutu çizin", "form_metin"),
-                 ("☑", "Onay Kutusu", lambda: m("form_onay"), "İşaretlenebilir kutu: tıklayın", "form_onay"),
-                 ("☰", "Açılır Liste", lambda: m("form_liste"), "Seçenek listesi: kutu çizin", "form_liste")],
-                [("🔏", "Formu Kilitle", self.form_kilitle, "Doldurulmuş değerleri sayfaya kalıcı işle (düzleştir)")],
-            ]
         if ad == "Dönüştür":
             return [
                 [("📝", "Word", self.word_e, "PDF → düzenlenebilir Word (.docx)"),
                  ("📊", "Excel", self.excel_e, "PDF tabloları → Excel"),
                  ("📽", "PowerPoint", self.pptx_e, "PDF → PowerPoint (her sayfa bir slayt)"),
                  ("🖼", "Resim", self.resme, "Sayfaları PNG / JPG kaydet"),
-                 ("📃", "Metin", self.metin_cikar, "Tüm yazıyı çıkar (gerekirse OCR)"),
-                 ("Ⓜ", "Markdown", self.markdown_e, "PDF → Markdown (.md), başlık ve tablolar korunur"),
-                 ("🗄", "PDF/A", self.pdfa_yap, "Uzun süreli arşiv biçimi (resmi kurumlar için)")],
+                 ("📃", "Metin", self.metin_cikar, "Tüm yazıyı çıkar (gerekirse OCR)")],
                 [("🖼", "Resimden", self.resimden_pdf, "Resimler → PDF"),
                  ("📝", "Word'den", self.wordden_pdf, "Word → PDF"),
                  ("📊", "Excel'den", self.excelden_pdf, "Excel → PDF"),
-                 ("📽", "PPT'den", self.pptden_pdf, "PowerPoint → PDF"),
-                 ("🌐", "HTML'den", self.htmlden_pdf, "Web sayfası / HTML → PDF")],
+                 ("📽", "PPT'den", self.pptden_pdf, "PowerPoint → PDF")],
+                [("⋯", "Diğer", [
+                    ("🌐", "HTML'den", self.htmlden_pdf, "Web sayfası / HTML → PDF"),
+                    ("Ⓜ", "Markdown", self.markdown_e, "PDF → Markdown (.md)"),
+                    ("🗄", "PDF/A", self.pdfa_yap, "Uzun süreli arşiv biçimi")],
+                  "HTML'den PDF, Markdown, PDF/A")],
             ]
         if ad == "Araçlar":
             return [
-                [("🗜", "Sıkıştır", self.sikistir, "Dosya boyutunu küçült (e-posta / sistem yüklemesi, hedef MB seçilebilir)")],
-                [("🔍", "OCR", self.ocr_aranabilir, "Taranmış sayfaların yazısını okunur / aranabilir yap"),
-                 ("📃", "Metni Çıkar", self.metin_cikar, "Tüm yazıyı pencerede göster")],
-                [("⚖", "Karşılaştır", self.karsilastir, "İki PDF arasındaki farkları yan yana renkli göster"),
-                 ("▦", "QR / Barkod", self.qr_oku, "Belgedeki QR kod ve barkodları oku (doğrulama linki vb.)")],
-                [("🔧", "Onar", self.onar, "Bozuk / açılmayan PDF'i kurtar"),
-                 ("🖼", "Resimleri Çıkar", self.resimleri_cikar, "Belgedeki tüm resimleri klasöre kaydet")],
-            ]
-        if ad == "Koruma":
-            return [
+                [("🗜", "Sıkıştır", self.sikistir, "Dosya boyutunu küçült (e-posta / sistem yüklemesi, hedef MB seçilebilir)"),
+                 ("🔍", "OCR", self.ocr_aranabilir, "Taranmış sayfaların yazısını okunur / aranabilir yap"),
+                 ("⚖", "Karşılaştır", self.karsilastir, "İki PDF arasındaki farkları yan yana renkli göster")],
                 [("🔒", "Şifre Koy", self.sifrele, "Şifreli kopya kaydet"),
-                 ("🔓", "Şifreyi Kaldır", self.sifre_kaldir, "Şifresiz kopya kaydet")],
-                [("⬛", "Karart", lambda: m("karart"), "KALICI gizle: alttaki bilgi tamamen silinir", "karart"),
+                 ("🔓", "Şifreyi Kaldır", self.sifre_kaldir, "Şifresiz kopya kaydet"),
                  ("🧹", "Bilgileri Temizle", self.bilgileri_temizle, "Yazar, program, tarih gibi gizli belge bilgilerini sil")],
+                [("📦", "Belge Paketi", self.belge_paketi, "Gemi evrakını sırasıyla tek PDF yap (ad şablonu + hedef MB)"),
+                 ("⚙", "İş Akışları", self.is_akislari, "Kayıtlı adımları tek tıkla uygula · klasöre toplu işlem")],
+                [("⋯", "Diğer", [
+                    ("▦", "QR / Barkod", self.qr_oku, "Belgedeki QR kod ve barkodları oku"),
+                    ("🔧", "Onar", self.onar, "Bozuk / açılmayan PDF'i kurtar"),
+                    ("🖼", "Resimleri Çıkar", self.resimleri_cikar, "Belgedeki tüm resimleri klasöre kaydet"),
+                    ("📃", "Metni Çıkar", self.metin_cikar, "Tüm yazıyı pencerede göster")],
+                  "QR / barkod, onar, resimleri çıkar, metni çıkar")],
             ]
         if ad == "Yapay Zeka":
             return [
@@ -533,17 +643,19 @@ class Uygulama(EkIslemler, _TemelTk):
                  ("🌍", "Çevir", self.cevir, "Sayfa düzenini koruyarak başka dile çevir")],
                 [("⚙", "Ayarlar", self.yz_ayarlar, "Yapay zeka anahtarı (Gemini / Groq ücretsiz)")],
             ]
-        if ad == "Otomasyon":
-            return [
-                [("📦", "Belge Paketi", self.belge_paketi, "Gemi evrakını sırasıyla tek PDF yap (ad şablonu + hedef MB)"),
-                 ("⚙", "İş Akışları", self.is_akislari, "Kayıtlı adımları tek tıkla uygula · klasördeki tüm PDF'lere toplu işlem")],
-            ]
-        return [[("🛡", "Yönetici", self.yonetici_ac, "Yönetici girişi: güncelleme yayınlama, sürümler, kaynak dosyalar"),
-                 ("🪟", "Windows'a Tanıt", self.windows_tanit,
-                  "PDF'e sağ tıklayınca 'Birlikte aç' listesinde ve 'PDF PRO ile aç' olarak görünsün; varsayılan yapılabilsin; "
-                  "klasörlerde PDF'lerin ilk sayfası önizleme olarak görünsün")],
-                [("❓", "Kılavuz", self.kilavuz, "F1"), ("ℹ", "Hakkında", self.hakkinda),
-                 ("🧾", "Hata Kaydı", self.hata_kaydi_ac)]]
+        return []
+
+    def yardim_ogeleri(self):
+        """Sağ üstteki ? menusu."""
+        return [("❓", "Kılavuz", self.kilavuz, ""),
+                ("⌨", "Klavye Kısayolları", self.kisayol_listesi, "F1"),
+                ("🎓", "Tanıtım Turu", lambda: self.tur_baslat(True), ""),
+                None,
+                ("🎨", "Görünüm", self.gorunum_ayarlari, "Açık / koyu tema, arayüz büyüklüğü"),
+                ("🪟", "Windows'a Tanıt", self.windows_tanit, "Birlikte aç, önizleme, varsayılan program"),
+                ("🛡", "Yönetici", self.yonetici_ac, "Güncelleme yayınlama"),
+                ("🧾", "Hata Kaydı", self.hata_kaydi_ac, ""),
+                ("ℹ", "Hakkında", self.hakkinda, "")]
 
     def _yazi_ayar_grubu(self, ust):
         abg = getattr(self, "_arac_bg", R_ARAC)
@@ -592,7 +704,7 @@ class Uygulama(EkIslemler, _TemelTk):
 
     # ---------------------------------------------------------- belge sekmeleri
     def _sekme_cubugu(self):
-        self._sekmeler = tk.Frame(self, bg="white", height=34)
+        self._sekmeler = tk.Frame(self, bg="white", height=TM.px(34))
         self._sekmeler.pack(fill="x")
         self._sekmeler.pack_propagate(False)
 
@@ -723,25 +835,6 @@ class Uygulama(EkIslemler, _TemelTk):
         else:
             komut()
 
-    def _son_dosyalar_ciz(self):
-        f = self._son_cerceve
-        for w in f.winfo_children():
-            w.destroy()
-        son = [y for y in self.ayar.get("son_dosyalar", []) if os.path.isfile(y)][:5]
-        if not son:
-            return
-        Z_ = f["bg"]
-        tk.Label(f, text="Son açılanlar:", bg=Z_, fg=R_SOLUK, font=(FONT, 9)).pack(side="left", padx=(0, 4))
-        for y in son:
-            ad = os.path.basename(y)
-            e = tk.Label(f, text="📄 " + (ad if len(ad) < 28 else ad[:25] + "…"), bg="white", fg="#26303F",
-                         font=(FONT, 9), cursor="hand2", padx=8, pady=2, highlightthickness=1, highlightbackground="#E1E5EE")
-            e.pack(side="left", padx=3)
-            e.bind("<Button-1>", lambda ev, yy=y: self.ac([yy]))
-            e.bind("<Enter>", lambda ev, w=e: w.config(highlightbackground="#E5322D", fg="#E5322D"))
-            e.bind("<Leave>", lambda ev, w=e: w.config(highlightbackground="#E1E5EE", fg="#26303F"))
-            IpucuBalonu(e, y)
-
     def karsilama_goster(self, goster, otomatik=False):
         if not hasattr(self, "_karsilama"):
             return
@@ -771,7 +864,7 @@ class Uygulama(EkIslemler, _TemelTk):
         return b
 
     def _durum_cubugu(self):
-        a = tk.Frame(self, bg=R_MENU, height=34)
+        a = tk.Frame(self, bg=R_MENU, height=TM.px(34))
         a.pack(fill="x", side="bottom")
         a.pack_propagate(False)
         tk.Frame(self, bg=R_LOGO, height=3).pack(fill="x", side="bottom")
@@ -871,7 +964,7 @@ class Uygulama(EkIslemler, _TemelTk):
         k("<Control-0>", lambda: self.gorunum.zoom_ayarla("genislik"))
         k("<Next>", lambda: self.git_adim(1), True)
         k("<Prior>", lambda: self.git_adim(-1), True)
-        k("<F1>", self.kilavuz)
+        k("<F1>", self.kisayol_listesi)
         k("<Control-f>", self.arama_ac)
         k("<Control-h>", lambda: self.arama_ac(degistir=True))
         k("<F3>", lambda: self.arama_git(1))
@@ -1860,9 +1953,13 @@ class Uygulama(EkIslemler, _TemelTk):
                 messagebox.showinfo("PDF PRO", "Tüm sayfalarda zaten yazı vardı; OCR gerekmedi.\n"
                                                "Yine de okutmak için 'Zaten yazısı olan sayfalara dokunma' işaretini kaldırın.")
             else:
-                self.durum_yaz(f"✔ {r[1]} sayfa OCR ile okundu. Artık 'Yazı Düzelt' ve arama kullanılabilir.", basari=True)
-        self.dosya_islem("OCR", lambda k, c, il, ip: O.aranabilir_pdf(k, c, s["dil"], s["dpi"], s["sadece"], il, ip),
-                         arka_plan=True, bitince=bitti)
+                notlar = r[2] if len(r) > 2 else []
+                self.durum_yaz(f"✔ {r[1]} sayfa okundu. Artık arama, kopyalama ve 'Yazı Düzelt' kullanılabilir."
+                               + (f"  ({'; '.join(notlar)[:160]})" if notlar else ""), basari=True)
+        yz = self.ayar.get("yz")
+        self.dosya_islem("OCR", lambda k, c, il, ip: O.aranabilir_pdf(
+            k, c, s["dil"], s["dpi"], s["sadece"], il, ip, iyilestir=s["iyilestir"], hizli=s["hizli"],
+            motor=s["motor"], yz_ayar=yz), arka_plan=True, bitince=bitti)
 
     def metin_cikar(self):
         b = self._belge_gerekli()
@@ -1877,8 +1974,17 @@ class Uygulama(EkIslemler, _TemelTk):
                                                     initialdir=os.path.dirname(b.yol) if b.yol else None,
                                                     filetypes=[(tur.upper(), "*." + tur)])
             DG.MetinPenceresi(self, metin, b.ad, kaydet_sor)
-        self.calistir("Metin çıkarılıyor", lambda il, ip: O.metin_cikar(kaynak, "tur+eng", 300, True, il, ip),
-                      bitti, iptal_edilebilir=True)
+        s = {"dil": "tur+eng", "dpi": 300, "hizli": False, "iyilestir": True, "motor": "tesseract"}
+        if O.ocr_gerekli_mi(kaynak):
+            s = DG.OcrDiyalog(self, "📃 Metni Çıkar", "Belgede taranmış (yazısı resim olan) sayfalar var; bunlar "
+                                                     "okunarak metne çevrilecek.", dugme="Çıkar",
+                              sadece_secenegi=False).ac()
+            if not s:
+                return
+        yz = self.ayar.get("yz")
+        self.calistir("Metin çıkarılıyor", lambda il, ip: O.metin_cikar(
+            kaynak, s["dil"], s["dpi"], True, il, ip, iyilestir=s["iyilestir"], hizli=s["hizli"],
+            motor=s["motor"], yz_ayar=yz), bitti, iptal_edilebilir=True)
 
     # ---------------------------------------------------------- donusturme
     def word_e(self):
@@ -1985,20 +2091,20 @@ class Uygulama(EkIslemler, _TemelTk):
         if not s:
             return
         c = self.cikti_yolu("kucuk")
-        adlar = {"hafif": "Hafif", "orta": "Orta", "guclu": "Güçlü", "en_kucuk": "En küçük", "asiri": "Aşırı"}
-
         def bitti(r):
-            yol, once, sonra, sev = r
-            ek = f"\nKullanılan seviye: {adlar.get(sev, sev)}"
+            yol, once, sonra, aciklama = r
+            ek = f"\nKullanılan ayar: {aciklama}"
             uyari = None
             if s["hedef_kb"] and sonra > s["hedef_kb"] * 1024:
-                uyari = (f"Hedeflenen {s['hedef_kb'] / 1024:g} MB'a inilemedi (en küçük hali bu). "
-                         "Siyah-beyaz seçeneğini deneyin ya da belgeyi 'Böl' ile parçalayın.")
+                uyari = (f"Hedeflenen {s['hedef_kb'] / 1024:g} MB'a inilemedi; ulaşılabilen en küçük hali bu. "
+                         + ("'Gri / siyah-beyaz yapmaya izin ver' seçeneğini açıp tekrar deneyin ya da " if not s.get("renk_izni") else "")
+                         + "belgeyi 'Böl' ile parçalara ayırın.")
             if sonra >= once * 0.97:
                 self.sonuc_goster(f"Dosya zaten küçük; daha fazla sıkıştırılamadı.\n{boyut_yaz(once)} → {boyut_yaz(sonra)}", yol, uyari=uyari)
             else:
                 self.sonuc_goster(f"{boyut_yaz(once)} → {boyut_yaz(sonra)}   (%{(1 - sonra / once) * 100:.0f} küçüldü){ek}", yol, uyari=uyari)
-        self.calistir("Sıkıştırılıyor", lambda il, ip: C.sikistir(k, c, s["seviye"], s["hedef_kb"], s["gri"], il, ip),
+        self.calistir("Sıkıştırılıyor", lambda il, ip: C.sikistir(k, c, s["seviye"], s["hedef_kb"], s["gri"], il, ip,
+                                                                       s.get("renk_izni", False)),
                       bitti, iptal_edilebilir=True)
 
     def sifrele(self):
@@ -2308,7 +2414,12 @@ class Uygulama(EkIslemler, _TemelTk):
 KILAVUZ = """PDF PRO — Kullanım Kılavuzu
 
 Ekran düzeni
-• Üstte menüler: Dosya · Giriş · Sayfa · İşaretle · İmza & Damga · Form · Dönüştür · Araçlar · Koruma · Yapay Zeka · Otomasyon · Yardım. Menüye tıklayınca altında o menünün düğmeleri çıkar. Düğmenin üzerinde durunca kısa açıklama görünür.
+• Üstte 7 sekme: Ana Sayfa · Düzenle · Sayfalar · İşaretle & İmza · Dönüştür · Araçlar · Yapay Zeka. Sekmeye tıklayınca altında o sekmenin düğmeleri çıkar. Düğmenin üzerinde durunca kısa açıklama görünür.
+• "▾" işaretli düğmeler (Diğer, Şekiller, Form Alanı) tıklayınca liste açar; az kullanılan araçlar oradadır. Pencere daralınca sığmayan araçlar "Daha »" düğmesine geçer.
+• ★ Sık kullanılan: her sekmenin solundaki küçük düğmeler. Program en çok kullandıklarınızı kendisi öğrenir. Herhangi bir araç düğmesine SAĞ TIKLAYIP "Sık kullanılanlara sabitle" diyebilirsiniz.
+• Sağ üstte ? : kılavuz, klavye kısayolları (F1), tanıtım turu, görünüm, Windows'a tanıt, yönetici, hata kaydı. 🌙 / ☀ düğmesi koyu / açık tema.
+• Belgede SAĞ TIK: yazının üstündeyse Düzelt, Kopyala, Vurgula, Beyaz kutuyla sil, Karart; her yerde Buraya yazı / not ekle, İmza koy, sayfayı döndür / sil / ayır.
+• Görünüm (? → Görünüm): Açık / Koyu tema ve yazı-simge büyüklüğü (Küçük, Normal, Büyük, Çok büyük). Yeniden başlatınca uygulanır; açık belgeler kendiliğinden yeniden açılır.
 • Altında açık belgelerin sekmeleri. Birden çok PDF aynı anda açık olabilir; ✕ ile kapatılır. Kaydedilmemiş belgenin adının başında ● olur.
 • Solda sayfaların küçük resimleri, ortada belge, altta sayfa numarası ve yakınlaştırma.
 • Dosyaları pencereye sürükleyip bırakarak da açabilirsiniz.
@@ -2325,7 +2436,7 @@ Ekran düzeni
 • Alttaki ↔ genişliğe, ▣ tek sayfaya sığdırır. Page Up / Page Down ile sayfa değiştirin.
 • Soldaki küçük resme tıklayınca o sayfaya gider.
 
-■ Yazı Düzelt (Giriş menüsü)
+■ Yazı Düzelt (Ana Sayfa ve Düzenle sekmeleri; yazıya sağ tık → Düzelt)
 • "✏ Yazı Düzelt"e basın, değiştirmek istediğiniz yazının üzerine gelin — turuncu çerçeve çıkar. Tıklayın, yazıyı değiştirin, Enter'a basın.
 • Yazı aynı yerde, aynı boyutta, aynı renkte ve kalınlıkta yeniden yazılır; arka plan, çizgiler ve resimler bozulmaz.
 • Normal moddayken yazıya ÇİFT TIKLAMAK da düzeltmeyi açar.
@@ -2340,7 +2451,7 @@ Ekran düzeni
 ■ Yazı tipi, boyut, renk, hizalama
 • Düzenleme kutusu açılınca üstünde koyu bir çubuk çıkar: yazı tipi, boyut, K (kalın), renk kutusu, hizalama (⇤ sola, ⇔ ortala, ⇥ sağa), ✔ uygula, ✖ vazgeç.
 • "Otomatik (orijinal)" belgenin kendi yazı tipini kullanır. Listede bilgisayarınızdaki tüm yazı tipleri vardır (Arial, Calibri, Segoe UI, Times New Roman…).
-• "Yazı Ekle" için varsayılan yazı tipi / boyut / renk Giriş menüsündeki "Yazı ekleme ayarı"ndan seçilir.
+• "Yazı Ekle" için varsayılan yazı tipi / boyut / renk Düzenle sekmesindeki "Yazı ekleme ayarı"ndan seçilir.
 
 ■ Ara / İşaretle
 • 🔍 Ara (Ctrl+F): Yazar yazmaz bulur, sarı ile işaretler; Enter / F3 sonraki, Shift+Enter önceki. Türkçe İ/ı farkını otomatik yakalar.
@@ -2349,7 +2460,7 @@ Ekran düzeni
 • ▭ ◯ ╱ ➚ Şekiller: Dikdörtgen, elips, çizgi, ok. Renk, Giriş'teki yazı rengidir.
 • ✂ Kırp: Sayfada kalacak alanı seçin (taramaların kenar boşluklarını atmak için). 📐 A4'e Sığdır: Farklı boyuttaki taramaları A4 yapar.
 • 💬 Not: Sayfaya yapışkan not / yorum. 🗨 Metin Kutusu: Çerçeveli açıklama kutusu (Türkçe karakterli).
-• 🔖 Damga (İmza & Damga menüsü): "ASLI GİBİDİR", "ONAYLANDI"… tarihli kaşe damgası; tıkladığınız yere basılır.
+• 🔖 Damga (İşaretle & İmza sekmesi): "ASLI GİBİDİR", "ONAYLANDI"… tarihli kaşe damgası; tıkladığınız yere basılır.
 
 ■ Yazı Ekle / Beyaz Kutu
 • "🔤 Yazı Ekle": Araç çubuğundan boyut, renk, kalın seçin; sayfada yazacağınız yere tıklayın, yazın, Enter.
@@ -2371,15 +2482,25 @@ Ekran düzeni
 • Böl: Belgeyi her sayfa ayrı, her N sayfada bir veya "1-3, 4-son" gibi aralıklarla parçalara ayırır.
 • Birleştir: Birden çok PDF ve resmi sıraya koyup tek belge yapar; sonuç yeni sekmede açılır.
 
-■ Antet, Filigran, Sayfa No (İmza & Damga menüsü)
+■ Antet, Filigran (İşaretle & İmza sekmesi), Sayfa No (Sayfalar sekmesi)
 • Antet: Word'deki antetli boş kağıdınızı PDF olarak kaydedip seçin. 2 sayfalı antette 2. sayfa devam sayfaları için kullanılır.
 • Filigran: GİZLİDİR, TASLAK, ASLI GİBİDİR… veya logo. Koyuluk %10-20 önerilir.
 • Sayfa No: "Sayfa 1 / 5" gibi.
 • Sonuç hemen ekranda görünür; beğenmezseniz Ctrl+Z.
 
-■ OCR (Araçlar menüsü)
-• "OCR": Taranmış sayfaların yazısını okur. Sonra kopyalama ve "Yazı Düzelt" kullanılabilir.
-• "Metni Çıkar": Tüm yazıyı pencerede gösterir; kopyalayın veya TXT/Word kaydedin.
+■ OCR (Araçlar sekmesi)
+• "OCR": Taranmış sayfaların yazısını okur. Sayfanın görünümü değişmez; üstüne görünmez yazı katmanı eklenir. Sonra arama, kopyalama ve "Yazı Düzelt" kullanılabilir.
+• Görüntüyü iyileştir (önerilen): eğik taramayı düzeltir, ters / yan sayfayı çevirir, gölge ve soluk yazıyı temizler. Telefonla çekilmiş belgelerde büyük fark yapar.
+• Kalite: Hızlı (hızlı model, 200 dpi) · Normal (en doğru model, 300 dpi) · Yüksek (400 dpi, küçük yazılar için).
+• Okuma: "Bilgisayarda oku" internetsiz çalışır. "Otomatik" zor okunan sayfaları Gemini yapay zekasına sorar; "Tümünü yapay zekayla oku" el yazısı ve kötü fotoğraflar içindir (Gemini anahtarı gerekir, sayfa resmi Google'a gönderilir).
+• "Metni Çıkar": Tüm yazıyı pencerede gösterir; kopyalayın veya TXT/Word kaydedin. Taranmış sayfa varsa aynı seçenekler sorulur.
+
+■ Sıkıştır
+• Seviye seçilirse o ayar uygulanır (Orta = 150 dpi önerilir).
+• Hedef boyut yazılırsa (örn. 2 MB) program o boyuta sığan EN KALİTELİ ayarı kendisi bulur; gereksiz bulanıklaştırmaz.
+• Siyah-beyaz taramalar kayıpsız ve çok küçük saklanır; renkli taranmış ama aslında siyah-beyaz olan sayfalar fark edilmeden griye çevrilir (kaşe / imza gibi renkli bir şey varsa dokunulmaz).
+• Çizim / plan ağırlıklı belgeler hedefe sığmazsa sayfalar resme çevrilir; yazılar yine aranabilir kalır.
+• "Gri / siyah-beyaz yapmaya izin ver" işaretliyse en son çare olarak renkten vazgeçilir; yazılar net kalır.
 
 ■ Koruma
 • Şifre Koy, Şifreyi Kaldır: Açık belge değişmez, yanına ayrı bir kopya kaydedilir.
@@ -2388,10 +2509,10 @@ Ekran düzeni
 ■ Güncellemeler ve Yönetici
 • PDF PRO açılışta yeni sürüm olup olmadığına bakar. Varsa sadece değişen dosyaları arka planda indirir; üst çubukta turuncu "⬆ … hazır · Güncelle" çıkar. Tıklarsanız hemen, tıklamazsanız bir sonraki açılışta güncellenir.
 • Her güncelleme yöneticinin imzasını taşır; imza tutmazsa yüklenmez. Yeni sürüm açılamazsa program kendiliğinden önceki sürüme döner.
-• Yardım → 🛡 Yönetici: kullanıcı adı ve şifreyle girilir. Yeni sürüm yayınlama, sürüm geçmişi, kaynak arşivi ve yeni bilgisayar için kurulum dosyası buradadır.
+• ? → 🛡 Yönetici: kullanıcı adı ve şifreyle girilir. Yeni sürüm yayınlama, sürüm geçmişi, kaynak arşivi ve yeni bilgisayar için kurulum dosyası buradadır.
 • Kurulum dosyası (PDF_PRO_Kurulum.exe): Yönetici → Kaynak Dosyalar → "Kurulum dosyası oluştur". Tek dosya; Python, kütüphaneler ve OCR içinde. Karşı taraf çift tıklayıp sihirbazı izler. "GitHub'a da yükle" seçilirse herkes aynı linkten indirebilir.
 
-■ Dosya menüsü (yeni)
+■ Ana Sayfa → Diğer ▾
 • 📠 Tara: Tarayıcıdan sayfa sayfa tarar, tek PDF yapar (isterseniz otomatik OCR).
 • 📧 E-posta: Outlook'ta PDF ekli yeni ileti açar (10 MB üstüyse önce sıkıştırabilir).
 • 🕘 Yedekler: Her "Kaydet"te dosyanın eski hali saklanır (son 10). Buradan eski hali açın veya dosyayı geri döndürün.
@@ -2425,7 +2546,7 @@ Ekran düzeni
 • ⚙ İş Akışları: OCR, damga, sayfa no, imza seti, filigran, antet, sıkıştır, PDF/A, şifre adımlarını kaydedin; açık belgeye, seçilen dosyalara veya bir klasördeki tüm PDF'lere tek tıkla uygulayın.
 
 Sorun olursa
-• Beklenmeyen hatalar program klasöründeki hata_kaydi.txt dosyasına yazılır (Yardım → Hata Kaydı).
+• Beklenmeyen hatalar program klasöründeki hata_kaydi.txt dosyasına yazılır (? → Hata Kaydı).
 """
 
 

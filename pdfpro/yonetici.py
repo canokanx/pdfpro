@@ -921,7 +921,7 @@ class YoneticiPaneli(tk.Toplevel):
             return
         disa_aktar(self.veri, os.path.normpath(y))
         messagebox.showinfo("PDF PRO", "Yönetici ayarları dışa aktarıldı:\n" + os.path.normpath(y) + "\n\n"
-                            "Yeni bilgisayarda: PDF PRO → Yardım → Yönetici → '📥 Başka bilgisayardaki yönetici "
+                            "Yeni bilgisayarda: PDF PRO → sağ üstteki ? → Yönetici → '📥 Başka bilgisayardaki yönetici "
                             "ayarlarımı aktar' → bu dosyayı seçin → kullanıcı adı ve şifrenizle giriş yapın.\n\n"
                             "Dosyadaki GitHub tokeni ve imza anahtarı yönetici şifrenizle şifrelidir. Yine de dosyayı "
                             "USB ile taşıyın, kimseyle paylaşmayın ve aktardıktan sonra silin.", parent=self)

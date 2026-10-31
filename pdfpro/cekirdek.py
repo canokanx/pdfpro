@@ -297,50 +297,15 @@ def _yazilar_ayni(a, b):
         return False
 
 
-def sikistir(yol, cikti, seviye="orta", hedef_kb=None, gri=False, ilerleme=None, iptal=None):
-    """PDF'i kucultur. seviye: hafif | orta | guclu | en_kucuk
-    hedef_kb verilirse (or. 1024 = 1 MB) o boyutun altina inene kadar seviyeyi kendisi artirir.
-    Donus: (cikti, once_bayt, sonra_bayt, kullanilan_seviye)"""
-    once = os.path.getsize(yol)
-    adlar = [a for a, _, _ in SIKISTIRMA_SEVIYELERI]
-    bas = adlar.index(seviye) if seviye in adlar else 1
-    denenecek = SIKISTIRMA_SEVIYELERI[bas:] if hedef_kb else [SIKISTIRMA_SEVIYELERI[bas]]
-    os.makedirs(os.path.dirname(os.path.abspath(cikti)), exist_ok=True)
-    gecici = cikti + ".tmp"
-    en_iyi = None
-    for ad, dpi, kalite in denenecek:
-        doc = pdf_ac(yol)
-        _resimleri_sikistir(doc, dpi, kalite, gri, ilerleme, iptal)
-        try:
-            doc.subset_fonts()
-        except Exception:
-            pass
-        # DIKKAT: clean=True kullanilmaz; bazi resmi belgelerde (Jasper/iText, ' operatoru)
-        # MuPDF'in icerik temizleyicisi yazilari asagi kaydiriyor.
-        try:
-            doc.save(gecici, garbage=4, deflate=True, deflate_images=True, deflate_fonts=True, use_objstms=1)
-        except TypeError:
-            doc.save(gecici, garbage=4, deflate=True, deflate_images=True, deflate_fonts=True)
-        doc.close()
-        if not _yazilar_ayni(yol, gecici):
-            # guvenlik: yazi yerleri degistiyse sadece resimleri sikistirilmis, font dokunulmamis hali kaydet
-            doc = pdf_ac(yol)
-            _resimleri_sikistir(doc, dpi, kalite, gri)
-            doc.save(gecici, garbage=3, deflate=True)
-            doc.close()
-            if not _yazilar_ayni(yol, gecici):
-                doc = pdf_ac(yol)
-                doc.save(gecici, garbage=3, deflate=True)
-                doc.close()
-        boy = os.path.getsize(gecici)
-        if en_iyi is None or boy < en_iyi[1]:
-            os.replace(gecici, cikti)
-            en_iyi = (ad, boy)
-        if not hedef_kb or boy <= hedef_kb * 1024:
-            break
-    if os.path.exists(gecici):
-        os.remove(gecici)
-    return cikti, once, os.path.getsize(cikti), en_iyi[0]
+def sikistir(yol, cikti, seviye="orta", hedef_kb=None, gri=False, ilerleme=None, iptal=None, renk_izni=False):
+    """PDF'i kucultur (ayrintilar: sikistirma.py). Donus: (cikti, once_bayt, sonra_bayt, aciklama)"""
+    from . import sikistirma
+    import shutil
+    c, once, sonra, aciklama = sikistirma.sikistir(yol, cikti, seviye, hedef_kb, gri, ilerleme, iptal, renk_izni)
+    if sonra > once:                       # kuculmediyse orijinal kalsin
+        shutil.copyfile(yol, cikti)
+        sonra = once
+    return c, once, sonra, aciklama
 
 
 def sifre_kaldir(yol, sifre, cikti):

@@ -170,6 +170,29 @@ def sor(ayar, istem, sistem=None, sicaklik=0.2, json_cikti=False):
         raise YZHata(f"Yapay zeka yanıt üretmedi: {json.dumps(y)[:300]}")
 
 
+def sor_resimle(ayar, istem, jpeg_bayt, json_cikti=False, sicaklik=0.1):
+    """Resimli istem (belge sayfasi okuma). Google Gemini gerekir."""
+    import base64
+    a = ayar_tam(ayar)
+    if not hazir_mi(ayar):
+        raise YZHata("Yapay zeka anahtarı girilmemiş.\nYapay Zeka → Ayarlar'dan ücretsiz bir Gemini anahtarı ekleyin.")
+    if a["tur"] != "gemini":
+        raise YZHata("Yapay zekayla sayfa okuma için Google Gemini gerekli.\n"
+                     "Yapay Zeka → Ayarlar'dan sağlayıcı olarak Google Gemini seçin.")
+    govde = {"contents": [{"role": "user", "parts": [
+                {"inline_data": {"mime_type": "image/jpeg", "data": base64.b64encode(jpeg_bayt).decode("ascii")}},
+                {"text": istem}]}],
+             "generationConfig": {"temperature": sicaklik}}
+    if json_cikti:
+        govde["generationConfig"]["responseMimeType"] = "application/json"
+    y = _gemini_gonder(a, govde)
+    try:
+        return "".join(p.get("text", "") for p in y["candidates"][0]["content"]["parts"]).strip()
+    except (KeyError, IndexError):
+        neden = (y.get("promptFeedback") or {}).get("blockReason") or json.dumps(y)[:300]
+        raise YZHata(f"Yapay zeka sayfayı okuyamadı: {neden}")
+
+
 def baglanti_testi(ayar):
     return sor(ayar, "Sadece 'Tamam' yaz.", sicaklik=0)
 
@@ -198,9 +221,10 @@ def belge_metni(doc, ocr_yol=None, ilerleme=None, iptal=None):
                     import pytesseract
                     from PIL import Image
                     O._hazirla()
-                    pix = p.get_pixmap(dpi=250, colorspace=fitz.csGRAY)
-                    img = Image.frombytes("L", (pix.width, pix.height), pix.samples)
-                    t = pytesseract.image_to_string(img, lang="tur+eng").strip()
+                    pix = p.get_pixmap(dpi=300, alpha=False)
+                    img = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
+                    img = O.OnIsleme(img, pytesseract).resim          # egim / yon / golge duzeltme
+                    t = pytesseract.image_to_string(img, lang="tur+eng", config="--oem 1 --psm 3").strip()
                 except Exception:
                     pass
         parcalar.append(f"--- Sayfa {i + 1} ---\n{t}")

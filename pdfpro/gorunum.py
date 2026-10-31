@@ -11,6 +11,8 @@ from collections import OrderedDict
 from .cekirdek import fitz, PdfProHata
 from . import duzenle as Z
 from . import teker as TK
+import itertools
+_SAYAC = itertools.count(1)
 
 WINDOWS = sys.platform.startswith("win")
 PT_PX = 96 / 72          # %100 = gercek boyut (96 dpi ekran)
@@ -241,6 +243,7 @@ class BelgeGorunumu(tk.Frame):
         t.bind("<Motion>", self._hareket)
         t.bind("<Leave>", lambda e: self._vurgu_temizle())
         t.bind("<Double-Button-1>", self._cift_tik)
+        t.bind("<Button-3>", self._sag_tik_belge)
         t.bind("<ButtonPress-2>", lambda e: t.scan_mark(e.x, e.y))
         t.bind("<B2-Motion>", lambda e: (t.scan_dragto(e.x, e.y, gain=1), self._gecikmeli_ciz()))
         t.bind("<Up>", lambda e: self._ok_tusu(e, 0, -1) or self._kaydir_birim(-2))
@@ -316,7 +319,7 @@ class BelgeGorunumu(tk.Frame):
         self._ys = [yy for (_, yy, _, _) in self.yerler]
         for i, (x, y0, w, h) in enumerate(self.yerler):
             t.create_rectangle(x + 3, y0 + 3, x + w + 3, y0 + h + 3, fill="#D1D5DB", outline="", tags="golge")
-            t.create_rectangle(x, y0, x + w, y0 + h, fill="white", outline="#C9CDD3", tags=("kagit", f"k{i}"))
+            t.create_rectangle(x, y0, x + w, y0 + h, fill="#FFFFFE", outline="#C9CDD3", tags=("kagit", f"k{i}"))
         if oran is not None:
             i, kesir = oran
             if i < len(self.yerler):
@@ -866,7 +869,7 @@ class BelgeGorunumu(tk.Frame):
             elif self.mod == "sekil_elips":
                 self.tuval.create_oval(x0, y0, cx, cy, outline="#C0392B", width=2, tags="secim")
             else:
-                dolgu = {"beyaz_kutu": "white", "karart": "black"}.get(self.mod, "")
+                dolgu = {"beyaz_kutu": "#FFFFFE", "karart": "black"}.get(self.mod, "")
                 stip = "gray50" if self.mod in ("karart", "vurgula") else ""
                 if self.mod == "vurgula":
                     dolgu = "#FFE94D"
@@ -911,6 +914,13 @@ class BelgeGorunumu(tk.Frame):
             rect = fitz.Rect(px0, py0, px0 + 180, py0 + 50)
         if rect.width > 2 and rect.height > 2:
             self.u.alan_secildi(self.mod, i, rect, (px0, py0), (px1, py1))
+
+    def _sag_tik_belge(self, e):
+        if not self.belge or self.u.mesgul:
+            return
+        n = self.nokta(e)
+        if n:
+            self.u.belge_sag_tik(e, n)
 
     def _cift_tik(self, e):
         if self.mod == "sec" and self.belge:
@@ -984,7 +994,7 @@ class BelgeGorunumu(tk.Frame):
         satir_px *= self.olcek
         if not coklu:
             var = tk.StringVar(value=metin)
-            giris = tk.Entry(self.tuval, textvariable=var, **ortak)
+            giris = tk.Entry(self.tuval, textvariable=var, name=f"kagit_giris{next(_SAYAC)}", **ortak)
             en_az = max(x1 - x0 + 40, 180)
             pencere = self.tuval.create_window(x0 - 4, y0 - 4, window=giris, anchor="nw", width=en_az,
                                                height=max(y1 - y0, abs(font[1]) * 1.3) + 10, tags="duzen")
@@ -992,7 +1002,8 @@ class BelgeGorunumu(tk.Frame):
             giris.icursor("end")
             ipucu = "Enter = uygula · Esc = vazgeç · Üstteki çubuktan yazı tipi / boyut / renk değiştirilebilir"
         else:
-            giris = tk.Text(self.tuval, wrap="none", undo=True, padx=2, pady=0, spacing1=0, spacing3=0, **ortak)
+            giris = tk.Text(self.tuval, wrap="none", undo=True, padx=2, pady=0, spacing1=0, spacing3=0,
+                            name=f"kagit_metin{next(_SAYAC)}", **ortak)
             giris.insert("1.0", metin)
             giris.configure(spacing2=max(0, int(satir_px - abs(font[1]) * 1.17)))
             sag = bilgi.get("sag_sinir", 0) if isinstance(bilgi, dict) else 0
@@ -1241,7 +1252,7 @@ class KucukResimler(tk.Frame):
             if secili:
                 t.create_rectangle(x - 7, y - 7, x + w + 7, y + h + 24, fill="#E5E7EB",
                                    outline="#4F46E5", width=2, tags="cerceve")
-            t.create_rectangle(x, y, x + w, y + h, fill="white", outline="#9AA5B4" if not aktif else "#4F46E5",
+            t.create_rectangle(x, y, x + w, y + h, fill="#FFFFFE", outline="#9AA5B4" if not aktif else "#4F46E5",
                                width=1 if not aktif else 2, tags=("cerceve", "kutu"))
             t.create_text(x + w / 2, y + h + 11, text=str(i + 1), fill="#4338CA" if (secili or aktif) else "#6B7685",
                           font=("Segoe UI" if WINDOWS else "DejaVu Sans", 9, "bold" if aktif else "normal"), tags="cerceve")
