@@ -137,8 +137,17 @@ def _kisa_hata(ayrinti):
         return ayrinti[:250]
 
 
-def sor(ayar, istem, sistem=None, sicaklik=0.2, json_cikti=False):
-    """Tek bir istem gonderir, yaniti metin olarak dondurur."""
+def _dusunmesiz(a, govde):
+    """Ceviri gibi basit islerde modelin uzun 'dusunme' adimini kapatir (cok daha hizli yanit)."""
+    m = (a.get("model") or "").lower()
+    if "pro" in m:
+        return False
+    govde["generationConfig"]["thinkingConfig"] = {"thinkingBudget": 0}
+    return True
+
+
+def sor(ayar, istem, sistem=None, sicaklik=0.2, json_cikti=False, hizli=False):
+    """Tek bir istem gonderir, yaniti metin olarak dondurur. hizli=True: modelin 'dusunme' adimi kapali."""
     a = ayar_tam(ayar)
     if not hazir_mi(ayar):
         raise YZHata("Yapay zeka anahtarı girilmemiş.\nYapay Zeka → Ayarlar'dan ücretsiz bir anahtar ekleyin.")
@@ -149,7 +158,16 @@ def sor(ayar, istem, sistem=None, sicaklik=0.2, json_cikti=False):
             govde["systemInstruction"] = {"parts": [{"text": sistem}]}
         if json_cikti:
             govde["generationConfig"]["responseMimeType"] = "application/json"
-        y = _gemini_gonder(a, govde)
+        if hizli and _dusunmesiz(a, govde):
+            try:
+                y = _gemini_gonder(a, govde)
+            except YZHata as e:
+                if "(400)" not in str(e) and "hink" not in str(e):
+                    raise
+                govde["generationConfig"].pop("thinkingConfig", None)     # model desteklemiyorsa normal
+                y = _gemini_gonder(a, govde)
+        else:
+            y = _gemini_gonder(a, govde)
         try:
             parcalar = y["candidates"][0]["content"]["parts"]
             return "".join(p.get("text", "") for p in parcalar).strip()
@@ -336,43 +354,99 @@ def _json_liste(yanit, n):
     return [str(x) for x in v]
 
 
+def _beklerken(fonk, iptal=None, haber=None, mesaj=""):
+    """fonk()'u ayri is parcaciginda calistirir; beklerken her saniye 'mesaj (N sn)' bildirir,
+    iptal edilirse beklemeyi hemen birakir."""
+    import threading
+    sonuc = {}
+
+    def calis():
+        try:
+            sonuc["deger"] = fonk()
+        except BaseException as e:      # noqa
+            sonuc["hata"] = e
+    t = threading.Thread(target=calis, daemon=True)
+    t.start()
+    bas = time.time()
+    while t.is_alive():
+        t.join(1.0)
+        if iptal and iptal():
+            raise PdfProHata("İptal edildi.")
+        if haber and t.is_alive():
+            haber(f"{mesaj} ({int(time.time() - bas)} sn)")
+    if "hata" in sonuc:
+        raise sonuc["hata"]
+    return sonuc.get("deger")
+
+
+def _numarali_cozumle(yanit, anahtarlar):
+    t = re.sub(r"^```(?:json)?\s*|\s*```$", "", (yanit or "").strip())
+    try:
+        v = json.loads(t)
+    except Exception:
+        m = re.search(r"\{.*\}", t, re.S)
+        if not m:
+            m = None
+        try:
+            v = json.loads(m.group(0)) if m else None
+        except Exception:
+            v = None
+    if isinstance(v, list) and len(v) == len(anahtarlar):
+        return {k: str(x) for k, x in zip(anahtarlar, v)}
+    if isinstance(v, dict):
+        if len(v) == 1 and isinstance(next(iter(v.values())), dict):
+            v = next(iter(v.values()))
+        return {str(k): str(x) for k, x in v.items() if str(k) in anahtarlar and isinstance(x, (str, int, float))}
+    return {}
+
+
 def metinleri_cevir(ayar, metinler, hedef_dil, ilerleme=None, iptal=None, etiket=""):
-    """Metin listesini cevirir (sirasi ve sayisi korunur)."""
+    """Metin listesini cevirir (sirasi ve sayisi korunur). Metinler numarali gonderilir; eksik
+    donenler toplu olarak bir kez daha istenir, yine olmazsa orijinali birakilir."""
     a = ayar_tam(ayar)
-    paket_sinir = min(6000, a.get("sinir", 30000) // 2)
+    paket_sinir = min(3000, a.get("sinir", 30000) // 3)
     sonuc = list(metinler)
     paketler, cur, boy = [], [], 0
     for i, m in enumerate(metinler):
-        if cur and (boy + len(m) > paket_sinir or len(cur) >= 60):
+        if cur and (boy + len(m) > paket_sinir or len(cur) >= 25):
             paketler.append(cur)
             cur, boy = [], 0
         cur.append(i)
         boy += len(m) + 8
     if cur:
         paketler.append(cur)
-    sistem = (f"Profesyonel bir çevirmensin. Verilen JSON dizisindeki her metni {hedef_dil} diline çevir. "
-              "Sayıları, tarihleri, kodları, e-posta/web adreslerini, gemi ve firma adlarını aynen bırak. "
-              "Kısa ve resmi belge diline uygun çevir. Çıktı SADECE aynı uzunlukta bir JSON dizisi olsun.")
+    sistem = (f"Profesyonel bir çevirmensin. Verilen JSON nesnesindeki her değeri {hedef_dil} diline çevir. "
+              "Anahtarları (numaraları) AYNEN koru, hiçbirini atlama veya birleştirme. "
+              "Sayıları, tarihleri, kodları, IBAN / vergi no gibi numaraları, e-posta/web adreslerini, gemi ve firma "
+              "adlarını aynen bırak. Resmi belge diline uygun, kısa çevir. Çıktı SADECE JSON nesnesi olsun: "
+              "{\"1\": \"çeviri\", \"2\": \"çeviri\", ...}")
+    eksik_toplam = 0
     for k, pk in enumerate(paketler):
         if iptal and iptal():
             raise PdfProHata("İptal edildi.")
-        if ilerleme:
-            ilerleme(k, len(paketler), f"{etiket}çeviri {k + 1}/{len(paketler)}")
-        girdi = [metinler[i] for i in pk]
-        cikti = None
-        for deneme in range(3):
-            y = sor(ayar, json.dumps(girdi, ensure_ascii=False), sistem=sistem, sicaklik=0.1, json_cikti=(a["tur"] == "gemini"))
-            cikti = _json_liste(y, len(girdi))
-            if cikti is not None:
+        ad = f"{etiket}çeviri {k + 1}/{len(paketler)}"
+        haber = (lambda m, k=k: ilerleme(k, len(paketler), m)) if ilerleme else None
+        if haber:
+            haber(ad)
+        bekleyen = {str(j + 1): metinler[i] for j, i in enumerate(pk)}
+        bulunan = {}
+        for deneme in range(2):
+            istem = json.dumps(bekleyen, ensure_ascii=False)
+            y = _beklerken(lambda: sor(ayar, istem, sistem=sistem, sicaklik=0.1, json_cikti=(a["tur"] == "gemini"),
+                                       hizli=True),
+                           iptal, haber, ad + " — yapay zekanın yanıtı bekleniyor")
+            gelen = _numarali_cozumle(y, list(bekleyen))
+            bulunan.update({kk: v for kk, v in gelen.items() if v.strip()})
+            bekleyen = {kk: v for kk, v in bekleyen.items() if kk not in bulunan}
+            if not bekleyen:
                 break
-            if deneme == 1 and len(girdi) > 1:
-                # tek tek cevir
-                cikti = [sor(ayar, f"Şu metni {hedef_dil} diline çevir, sadece çeviriyi yaz:\n{m}", sicaklik=0.1) for m in girdi]
-                break
-        if cikti is None:
-            raise YZHata("Yapay zeka çeviriyi beklenen biçimde döndürmedi. Tekrar deneyin.")
-        for i, c in zip(pk, cikti):
-            sonuc[i] = c
+        eksik_toplam += len(bekleyen)
+        for j, i in enumerate(pk):
+            c = bulunan.get(str(j + 1))
+            if c:
+                sonuc[i] = c
+    if eksik_toplam and eksik_toplam == len(metinler):
+        raise YZHata("Yapay zeka çeviriyi beklenen biçimde döndürmedi. Tekrar deneyin.")
     return sonuc
 
 
